@@ -24,7 +24,7 @@ class Player:
         self.figures = []
         self.towers = [4] * 4
         self.fields = [1] * 3
-        self.food = sum(self.fields)
+        self.food = sum(self.fields) * 2
 
     def get_food(self):
         return str(self.spend_food) + '/' + str(self.food)
@@ -61,6 +61,7 @@ class Board:
         self.players = [Player(Board), Player(Board)]
         self.canmove = True
         self.marker = None
+        self.field_marker = None
         self.variants = []
 
     def set_view(self, left, top, cell_size):
@@ -93,9 +94,17 @@ class Board:
 
         # Поля
         for i, elem in enumerate(self.players[0].fields):
+            if self.field_marker == i:
+                image = load_image("выделение_1.png")
+                image = pygame.transform.scale(image, (self.cell_size * 4, self.cell_size * 2))
+                screen.blit(image, (cell_size, cell_size * 2 + i * cell_size * 2))
+
             image = load_image(f'поле_{elem}.png')
             image = pygame.transform.scale(image, (self.cell_size * 4, self.cell_size * 2))
             screen.blit(image, (cell_size, cell_size * 2 + i * cell_size * 2))
+
+            text = font.render(str(elem) + '/3', True, (0, 0, 0))
+            screen.blit(text, (cell_size, cell_size * 2 + i * cell_size * 2))
 
         # Башни
         for i, playeri in enumerate(self.players):
@@ -162,31 +171,31 @@ class Board:
 
     def on_click(self, cell_coords):
         if cell_coords is not None:
-            if 6 < cell_coords[0] < 15 and 0 < cell_coords[0]:
+            if 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
                 if self.can_place(self.board[y][x], x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
                     self.marker = x, y
+            elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
+                field_coords = (cell_coords[1] - 2) // 2
+                if self.field_marker is None or self.field_marker != field_coords:
+                    self.field_marker = field_coords
+                elif self.field_marker == field_coords and self.players[0].money >= 10\
+                        and self.players[0].fields[field_coords] < 3:
+                    self.players[0].fields[field_coords] += 1
+                    self.players[0].food = sum(self.players[0].fields) * 2
+                    self.players[0].money -= 10
+                    self.field_marker = None
+                else:
+                    self.field_marker = None
 
     def get_cell(self, mouse_pos):
         x, y = mouse_pos
         if x < 0 or y < 0 or x > self.cell_size * 16 or y > self.cell_size * 9:
             return None
         return x // self.cell_size, y // self.cell_size
-
-    def to_real(self, coord, type):
-        if type == 'x':
-            return coord * board.cell_size + board.left
-        else:
-            return coord * board.cell_size + board.top
-
-    def can_place(self, cell, x, y):
-        if cell == 0 and (x == 0 and self.player == 1 or x == 7 and self.player == 2)\
-                and self.players[self.player - 1].towers[y // 2] > 0:
-            return True
-        return False
 
     def get_key(self, key):
         if len(self.variants) > 0 and \
@@ -203,6 +212,18 @@ class Board:
                 for i in self.players:
                     i.money += 1
             self.variants = []
+
+    def to_real(self, coord, type):
+        if type == 'x':
+            return coord * board.cell_size + board.left
+        else:
+            return coord * board.cell_size + board.top
+
+    def can_place(self, cell, x, y):
+        if cell == 0 and (x == 0 and self.player == 1 or x == 7 and self.player == 2)\
+                and self.players[self.player - 1].towers[y // 2] > 0:
+            return True
+        return False
 
 
 pygame.init()
