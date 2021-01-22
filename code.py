@@ -50,24 +50,21 @@ class Figure:
 
 
 class Board:
-    def __init__(self, width, height):
+    def __init__(self, width, height, cell_size):
         self.width = width
         self.height = height
-        self.left = 10
-        self.top = 10
-        self.cell_size = 30
+        self.left = cell_size * 7
+        self.top = cell_size
+        self.cell_size = cell_size
+
         self.board = [[0] * width for _ in range(height)]
         self.player = 1
         self.players = [Player(Board), Player(Board)]
+
         self.canmove = True
         self.marker = None
         self.field_marker = None
         self.variants = []
-
-    def set_view(self, left, top, cell_size):
-        self.left = left
-        self.top = top
-        self.cell_size = cell_size
 
     def render(self, screen):
         # Выделение ходящего игрока
@@ -104,7 +101,7 @@ class Board:
             screen.blit(image, (cell_size, cell_size * 2 + i * cell_size * 2))
 
             text = font.render(str(elem) + '/3', True, (0, 0, 0))
-            screen.blit(text, (cell_size, cell_size * 2 + i * cell_size * 2))
+            screen.blit(text, (cell_size * 3 // 4, cell_size * 2 + i * cell_size * 2))
 
         # Башни
         for i, playeri in enumerate(self.players):
@@ -116,7 +113,7 @@ class Board:
                     name = "башня_2.png"
                 if name != '':
                     image = load_image(name)
-                    image = pygame.transform.scale(image, (self.cell_size, self.cell_size * 2))
+                    image = pygame.transform.scale(image, (self.cell_size, int(self.cell_size * 2.5)))
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
 
@@ -197,11 +194,11 @@ class Board:
             return None
         return x // self.cell_size, y // self.cell_size
 
-    def get_key(self, key):
-        if len(self.variants) > 0 and \
-                key in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
+    def get_key(self, unicode, key):
+        if len(self.variants) > 0 and\
+                unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
             x, y = self.marker
-            new_figure = self.variants[int(key) - 1]
+            new_figure = self.variants[int(unicode) - 1]
             self.board[y][x] = new_figure
             self.players[self.player - 1].spend_food += new_figure.food
             self.players[self.player - 1].money -= new_figure.money
@@ -212,6 +209,9 @@ class Board:
                 for i in self.players:
                     i.money += 1
             self.variants = []
+        if key == 27:
+            pygame.quit()
+            sys.exit()
 
     def to_real(self, coord, type):
         if type == 'x':
@@ -227,11 +227,11 @@ class Board:
 
 
 pygame.init()
-cell_size = 90
+infoObject = pygame.display.Info()
+cell_size = max([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
-screen = pygame.display.set_mode(size, pygame.SRCALPHA)
-board = Board(8, 8)
-board.set_view(cell_size * 7, cell_size, cell_size)
+screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
+board = Board(8, 8, cell_size)
 
 running = True
 while running:
@@ -241,7 +241,8 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             board.get_click(event.pos)
         if event.type == pygame.KEYDOWN:
-            board.get_key(event.unicode)
+            board.get_key(event.unicode, event.key)
+    screen.fill((0, 153, 0))
     image = load_image("фон.png")
     image = pygame.transform.scale(image, size)
     screen.blit(image, (0, 0))
