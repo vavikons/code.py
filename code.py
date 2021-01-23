@@ -187,6 +187,8 @@ class Board:
                     self.field_marker = None
                 else:
                     self.field_marker = None
+            elif cell_coords[0] == 0 and cell_coords[1] == 1:
+                info_screen(board)
 
     def get_cell(self, mouse_pos):
         x, y = mouse_pos
@@ -231,11 +233,12 @@ def terminate():
     sys.exit()
 
 
-def start_screen(screen):
+def start_screen():
     intro_text = ["ЗАСТАВКА", "",
-                  "Правила игры",
-                  "Если в правилах несколько строк,",
-                  "приходится выводить их построчно"]
+                  "Привет",
+                  "Тут будет фон",
+                  "Но потом",
+                  'а пока нажми любую клавишу']
 
     screen.fill((0, 153, 0))
     font = pygame.font.Font(None, 30)
@@ -259,12 +262,72 @@ def start_screen(screen):
         pygame.display.flip()
 
 
+def info_screen(board):
+    board.canmove = False
+    intro_text = ["ПРАВИЛА", "",
+                  "Правильно +",
+                  "Не правильно -",
+                  ":/"]
+
+    screen.fill((0, 153, 0))
+    font = pygame.font.Font(None, 30)
+    text_coord = 50
+    for line in intro_text:
+        string_rendered = font.render(line, 1, (255, 255, 255))
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                board.canmove = True
+                return
+        pygame.display.flip()
+
+
+def end_screen(board):
+    board.canmove = False
+    intro_text = ["Конец", "",
+                  "Кто-то победил",
+                  "Наверно",
+                  ":( / :)"]
+
+    screen.fill((0, 153, 0))
+    font = pygame.font.Font(None, 30)
+    text_coord = 50
+    for line in intro_text:
+        string_rendered = font.render(line, 1, (255, 255, 255))
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                board.canmove = True
+                return
+        pygame.display.flip()
+
+
 pygame.init()
 infoObject = pygame.display.Info()
 cell_size = max([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
 screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
-start_screen(screen)
+start_screen()
 board = Board(8, 8, cell_size)
 
 running = True
@@ -282,4 +345,8 @@ while running:
     screen.blit(image, (0, 0))
     board.render(screen)
     pygame.display.flip()
+    if sum(board.players[0].towers) == 0 or \
+            sum(board.players[1].towers) == 0:
+        end_screen(board)
+        running = False
 pygame.quit()
