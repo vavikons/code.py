@@ -69,9 +69,9 @@ class Board:
     def render(self, screen):
         # Выделение ходящего игрока
         if self.player == 1:
-            pygame.draw.rect(screen, (0, 0, 255), ((0, 0), (self.cell_size * 3, self.cell_size)), 5)
+            pygame.draw.rect(screen, (0, 0, 255), ((0, 0), (self.cell_size * 7, self.cell_size)), 5)
         else:
-            pygame.draw.rect(screen, (255, 0, 0), ((self.cell_size * 12, 0), (self.cell_size * 4, self.cell_size)), 5)
+            pygame.draw.rect(screen, (255, 0, 0), ((self.cell_size * 8, 0), (self.cell_size * 8, self.cell_size)), 5)
 
         # Количсетво предметов у игроков
         text_size = self.cell_size // 5 * 2
@@ -167,7 +167,7 @@ class Board:
         self.on_click(cell)
 
     def on_click(self, cell_coords):
-        if cell_coords is not None:
+        if cell_coords is not None and self.canmove:
             if 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
                 x, y = cell_coords
                 x -= 7
@@ -195,23 +195,23 @@ class Board:
         return x // self.cell_size, y // self.cell_size
 
     def get_key(self, unicode, key):
-        if len(self.variants) > 0 and\
-                unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
-            x, y = self.marker
-            new_figure = self.variants[int(unicode) - 1]
-            self.board[y][x] = new_figure
-            self.players[self.player - 1].spend_food += new_figure.food
-            self.players[self.player - 1].money -= new_figure.money
-            if self.player == 1:
-                self.player = 2
-            else:
-                self.player = 1
-                for i in self.players:
-                    i.money += 1
-            self.variants = []
+        if self.canmove:
+            if len(self.variants) > 0 and \
+                    unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
+                x, y = self.marker
+                new_figure = self.variants[int(unicode) - 1]
+                self.board[y][x] = new_figure
+                self.players[self.player - 1].spend_food += new_figure.food
+                self.players[self.player - 1].money -= new_figure.money
+                if self.player == 1:
+                    self.player = 2
+                else:
+                    self.player = 1
+                    for i in self.players:
+                        i.money += 1
+                self.variants = []
         if key == 27:
-            pygame.quit()
-            sys.exit()
+            terminate()
 
     def to_real(self, coord, type):
         if type == 'x':
@@ -226,11 +226,45 @@ class Board:
         return False
 
 
+def terminate():
+    pygame.quit()
+    sys.exit()
+
+
+def start_screen(screen):
+    intro_text = ["ЗАСТАВКА", "",
+                  "Правила игры",
+                  "Если в правилах несколько строк,",
+                  "приходится выводить их построчно"]
+
+    screen.fill((0, 153, 0))
+    font = pygame.font.Font(None, 30)
+    text_coord = 50
+    for line in intro_text:
+        string_rendered = font.render(line, 1, (255, 255, 255))
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                return
+        pygame.display.flip()
+
+
 pygame.init()
 infoObject = pygame.display.Info()
 cell_size = max([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
 screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
+start_screen(screen)
 board = Board(8, 8, cell_size)
 
 running = True
