@@ -31,15 +31,15 @@ class Player:
 
 
 class Figure:
-    def __init__(self, board, pos, color, name, food, hps, dmg, radius, money):
+    def __init__(self, board, pos, color, name, food, hps, hits, steps, money):
         self.board = board
         self.pos = pos
         self.color = color
         self.name = name
         self.food = food
         self.hps = hps
-        self.dmg = dmg
-        self.radius = radius
+        self.hits = hits
+        self.steps = steps
         self.money = money
         self.name = name
         self.coords = board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')
@@ -47,6 +47,9 @@ class Figure:
 
     def get_name(self):
         return self.name + '_' + str(self.color) + '_1' + '.png'
+
+    def __repr__(self):
+        return f'name={self.name}, color={self.color}, coords={self.coords}'
 
 
 class Board:
@@ -63,6 +66,9 @@ class Board:
 
         self.canmove = True
         self.marker = None
+        self.marker_fig = None
+        self.fig_steps = 0
+        self.fig_hits = 0
         self.field_marker = None
         self.variants = []
 
@@ -149,11 +155,10 @@ class Board:
                                        self.to_real(y, 'y') + text.get_height() // 2))
                     self.variants = good
 
+
         # Фигуры на поле
         for i in range(self.height):
-            y = self.to_real(i, 'y')
             for j in range(self.width):
-                x = self.to_real(j, 'x')
                 obj = self.board[i][j]
                 if obj != 0:
                     image = load_image(obj.get_name())
@@ -161,6 +166,27 @@ class Board:
                     if obj.color == 2:
                         image = flip(image)
                     screen.blit(image, obj.coords)
+                    hp = obj.hps
+                    for m in range(hp):
+                        image = load_image('сердце.png')
+                        image = pygame.transform.scale(image, (self.cell_size // 6, self.cell_size // 6))
+                        screen.blit(image, (obj.coords[0] + m * self.cell_size // 6,
+                                            obj.coords[1]))
+
+        # Еще выделение
+        if self.marker is not None:
+            x, y = self.marker
+            if not self.can_place(self.board[y][x], x, y):
+                if self.marker_fig is None:
+                    obj = self.board[y][x]
+                    steps_hits = ['шаги.png'] * obj.steps + ['атака.png'] * obj.hits
+                else:
+                    steps_hits = ['шаги.png'] * self.steps + ['атака.png'] * self.hits
+                for i, elem in enumerate(steps_hits):
+                    image = load_image(elem)
+                    image = pygame.transform.scale(image, (self.cell_size // 3, self.cell_size // 3))
+                    screen.blit(image, (self.to_real(x, 'x') + i * self.cell_size // 3,
+                                        self.to_real(y, 'y') + self.cell_size // 3 * 2))
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -234,29 +260,14 @@ def terminate():
 
 
 def start_screen():
-    intro_text = ["ЗАСТАВКА", "",
-                  "Привет",
-                  "Тут будет фон",
-                  "Но потом",
-                  'а пока нажми любую клавишу']
-
     screen.fill((0, 153, 0))
-    font = pygame.font.Font(None, 30)
-    text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, (255, 255, 255))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
+    image = load_image("стартовый_фон.png")
+    image = pygame.transform.scale(image, size)
+    screen.blit(image, (0, 0))
 
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                terminate()
-            elif event.type == pygame.KEYDOWN or \
+            if event.type == pygame.KEYDOWN or \
                     event.type == pygame.MOUSEBUTTONDOWN:
                 return
         pygame.display.flip()
@@ -264,67 +275,47 @@ def start_screen():
 
 def info_screen(board):
     board.canmove = False
-    intro_text = ["ПРАВИЛА", "",
-                  "Правильно +",
-                  "Не правильно -",
-                  ":/"]
-
-    screen.fill((0, 153, 0))
-    font = pygame.font.Font(None, 30)
-    text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, (255, 255, 255))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
+    page = 1
 
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                terminate()
-            elif event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                board.canmove = True
-                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cell = board.get_cell(event.pos)
+                if cell[0] == 15 and cell[1] == 0:
+                    board.canmove = True
+                    return
+                elif page == 1 and cell[0] == 15 and cell[1] == 8:
+                    page = 2
+                elif page == 2 and cell[0] == 0 and cell[1] == 8:
+                    page = 1
+        screen.fill((205, 183, 135))
+        image = load_image(f"правила_фон_{page}.png")
+        image = pygame.transform.scale(image, size)
+        screen.blit(image, (0, 0))
         pygame.display.flip()
 
 
 def end_screen(board):
-    board.canmove = False
-    intro_text = ["Конец", "",
-                  "Кто-то победил",
-                  "Наверно",
-                  ":( / :)"]
-
     screen.fill((0, 153, 0))
-    font = pygame.font.Font(None, 30)
-    text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, (255, 255, 255))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
+    if sum(board.players[0].towers) == 0:
+        name = 'конечный_фон_1.png'
+    else:
+        name = 'конечный_фон_2.png'
+    image = load_image(name)
+    image = pygame.transform.scale(image, size)
+    screen.blit(image, (0, 0))
 
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                terminate()
-            elif event.type == pygame.KEYDOWN or \
+            if event.type == pygame.KEYDOWN or \
                     event.type == pygame.MOUSEBUTTONDOWN:
-                board.canmove = True
                 return
         pygame.display.flip()
 
 
 pygame.init()
 infoObject = pygame.display.Info()
-cell_size = max([infoObject.current_w // 16, infoObject.current_h // 9])
+cell_size = min([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
 screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 start_screen()
