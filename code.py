@@ -51,6 +51,21 @@ class Figure:
     def __repr__(self):
         return f'name={self.name}, color={self.color}, coords={self.coords}'
 
+    def can_attack(self, obj):
+        if self is obj or obj == 0:
+            return False
+        if max([self.pos[0] - obj.pos[0], self.pos[1] - obj.pos[1]]) == 1\
+                and self.color != obj.color:
+            return True
+        return False
+
+    def can_go_to(self, obj, x, y, steps):
+        if self is obj or obj != 0:
+            return False
+        if abs(self.pos[0] - x) + abs(self.pos[1] - y) <= steps:
+            return True
+        return False
+
 
 class Board:
     def __init__(self, width, height, cell_size):
@@ -123,13 +138,16 @@ class Board:
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
 
-        # Выделение
         if self.marker is not None:
             x, y = self.marker
+            cell = self.board[y][x]
+
+        # Выделение
+        if self.marker is not None:
             image = load_image("выделение_1.png")
             image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
             screen.blit(image, (self.to_real(x, 'x'), self.to_real(y, 'y')))
-            if self.can_place(self.board[y][x], x, y):
+            if self.can_place(cell, x, y):
                 a = Figure(self, (x, y), self.player, 'мечник', 1, 2, 1, 1, 2)
                 b = Figure(self, (x, y), self.player, 'копейщик', 1, 2, 2, 1, 4)
                 c = Figure(self, (x, y), self.player, 'всадник', 2, 3, 1, 2, 4)
@@ -154,7 +172,22 @@ class Board:
                     screen.blit(text, (self.to_real(x, 'x') + (self.cell_size - text.get_width()) // 2,
                                        self.to_real(y, 'y') + text.get_height() // 2))
                     self.variants = good
-
+            else:
+                for i in range(self.height):
+                    for j in range(self.width):
+                        obj = self.board[i][j]
+                        if self.marker_fig is not None:
+                            steps = self.fig_steps
+                        else:
+                            steps = cell.steps
+                        if cell.can_attack(obj):
+                            image = load_image("выделение_2.png")
+                            image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
+                            screen.blit(image, (self.to_real(j, 'x'), self.to_real(i, 'y')))
+                        elif cell.can_go_to(obj, j, i, steps):
+                            image = load_image("выделение_3.png")
+                            image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
+                            screen.blit(image, (self.to_real(j, 'x'), self.to_real(i, 'y')))
 
         # Фигуры на поле
         for i in range(self.height):
@@ -175,13 +208,12 @@ class Board:
 
         # Еще выделение
         if self.marker is not None:
-            x, y = self.marker
-            if not self.can_place(self.board[y][x], x, y):
+            if not self.can_place(cell, x, y):
                 if self.marker_fig is None:
-                    obj = self.board[y][x]
+                    obj = cell
                     steps_hits = ['шаги.png'] * obj.steps + ['атака.png'] * obj.hits
                 else:
-                    steps_hits = ['шаги.png'] * self.steps + ['атака.png'] * self.hits
+                    steps_hits = ['шаги.png'] * self.fig_steps + ['атака.png'] * self.fig_hits
                 for i, elem in enumerate(steps_hits):
                     image = load_image(elem)
                     image = pygame.transform.scale(image, (self.cell_size // 3, self.cell_size // 3))
@@ -224,6 +256,7 @@ class Board:
 
     def get_key(self, unicode, key):
         if self.canmove:
+            self.board[0][6] = Figure(self, (6, 0), 1, 'мечник', 1, 2, 1, 1, 2)
             if len(self.variants) > 0 and \
                     unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
                 x, y = self.marker
