@@ -45,7 +45,6 @@ class Player:
 class Figure:
     def __init__(self, board, pos, color, name, food, hps, hits, steps, money):
         self.board = board
-        self.pos = pos
         self.color = color
         self.name = name
         self.food = food
@@ -54,7 +53,7 @@ class Figure:
         self.steps = steps
         self.money = money
         self.name = name
-        self.coords = [board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')]
+        self.set_pos(pos)
         self.moving = False
 
     def get_name(self, num=1):
@@ -77,6 +76,13 @@ class Figure:
         if abs(self.pos[0] - x) + abs(self.pos[1] - y) <= 1:
             return True
         return False
+
+    def distance(self, obj):
+        return abs(self.pos[0] - obj.pos[0]) + abs(self.pos[1] - obj.pos[1])
+
+    def set_pos(self, pos):
+        self.pos = pos
+        self.coords = [board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')]
 
 
 class Board:
@@ -273,6 +279,7 @@ class Board:
         self.on_click(cell)
 
     def on_click(self, cell_coords):
+        print(cell_coords)
         if cell_coords is not None and self.canmove:
             if 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
                 x, y = cell_coords
@@ -372,6 +379,8 @@ class Board:
                     unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
                 x, y = self.marker
                 new_figure = self.variants[int(unicode) - 1]
+                new_figure.set_pos([x, y])
+                new_figure.color = self.player
                 self.board[y][x] = new_figure
                 self.figures.append(new_figure)
                 self.players[self.player - 1].spend_food += new_figure.food
@@ -392,7 +401,7 @@ class Board:
                     self.board[fig.pos[1]][fig.pos[0]] = 0
                     fig.pos[0] += self.direction[0]
                     fig.pos[1] += self.direction[1]
-                    fig.coords = [self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')]
+                    fig.set_pos([fig.pos])
                     self.run_count = 0
                     self.board[fig.pos[1]][fig.pos[0]] = fig
                     self.direction = [0, 0]
@@ -460,6 +469,20 @@ class Board:
             self.player = 2
             if AI:
                 print('ИИ в разработке')
+                score = [0, 0]
+                if len(self.figures) == 1:
+                    self.on_click((14, self.figures[0].pos[1] + 1))
+                    # ['1', 49]
+                    # ['2', 50]
+                    # ['3', 51]
+                    self.get_key('1', 49)
+                else:
+                    for fig in self.figures:
+                        score[fig.color - 1] += fig.pos[0] * \
+                                                min(list(map(lambda x: fig.distance(x),
+                                                             filter(lambda x: x.color != fig.color, self.figures)))) * \
+                                                fig.hits * fig.steps
+                print(score)
         else:
             self.player = 1
             for i in self.players:
