@@ -82,6 +82,7 @@ class Figure:
 
     def set_pos(self, pos):
         self.pos = pos
+        print(pos)
         self.coords = [board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')]
 
 
@@ -401,7 +402,7 @@ class Board:
                     self.board[fig.pos[1]][fig.pos[0]] = 0
                     fig.pos[0] += self.direction[0]
                     fig.pos[1] += self.direction[1]
-                    fig.set_pos([fig.pos])
+                    fig.set_pos(fig.pos)
                     self.run_count = 0
                     self.board[fig.pos[1]][fig.pos[0]] = fig
                     self.direction = [0, 0]
@@ -574,7 +575,7 @@ def main():
 pygame.init()
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play()
-AI = True
+AI = False
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
