@@ -213,6 +213,7 @@ class Board:
         # Фигуры на поле
         for obj in self.figures:
             hit = False
+            rotate = 0
             if obj == self.marker_fig:
                 if self.direction != [0, 0]:
                     image = load_image(obj.get_name(self.run_count + 2))
@@ -228,6 +229,7 @@ class Board:
                     if self.tower is None and (self.enemy.pos[0] > obj.pos[0] and self.player == 2 or
                        self.enemy.pos[0] < obj.pos[0] and self.player == 1):
                         image = flip(image)
+                        rotate += 1
                 else:
                     image = load_image(obj.get_name())
             else:
@@ -238,7 +240,8 @@ class Board:
                 image = scale(image, (self.cell_size, self.cell_size))
             if obj.color == 2:
                 image = flip(image)
-            if hit and self.player == 2:
+                rotate += 1
+            if hit and rotate % 2 > 0:
                 screen.blit(image, (obj.coords[0] - int(cell_size * 0.5), obj.coords[1]))
             else:
                 screen.blit(image, obj.coords)
@@ -341,7 +344,7 @@ class Board:
                     self.field_marker = None
                 else:
                     self.field_marker = None
-            elif cell_coords[0] == 5 and cell_coords[1] == 1:
+            elif cell_coords[0] == 5 and cell_coords[1] == 1 and (self.player == 1 or not AI):
                 self.marker_fig = None
                 self.fig_steps = 0
                 self.direction = [0, 0]
@@ -548,7 +551,7 @@ def main():
 pygame.init()
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play()
-AI = False
+AI = True
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
