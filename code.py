@@ -3,13 +3,18 @@ import os
 import sys
 
 
-def load_image(name):
+def load_image(name, extension='.png'):
     fullname = os.path.join('data', name)
+    fullname += extension
     if not os.path.isfile(fullname):
         fullname = os.path.join('data', 'not_found.png')
     image = pygame.image.load(fullname)
     image = image.convert_alpha()
     return image
+
+
+def scale(image, size):
+    return pygame.transform.scale(image, size)
 
 
 def flip(image):
@@ -42,27 +47,27 @@ class Figure:
         self.steps = steps
         self.money = money
         self.name = name
-        self.coords = board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')
+        self.coords = [board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')]
         self.moving = False
 
-    def get_name(self):
-        return self.name + '_' + str(self.color) + '_1' + '.png'
+    def get_name(self, num=1):
+        return self.name + '_' + str(self.color) + '_' + str(num) + ''
 
     def __repr__(self):
-        return f'name={self.name}, color={self.color}, coords={self.coords}'
+        return f'name=Figure({self.name}, color={self.color}, coords={self.coords})'
 
-    def can_attack(self, obj):
+    def can_attack(self, obj, x, y):
         if self is obj or obj == 0:
             return False
-        if max([self.pos[0] - obj.pos[0], self.pos[1] - obj.pos[1]]) == 1\
+        if abs(self.pos[0] - x) + abs(self.pos[1] - y) <= 1\
                 and self.color != obj.color:
             return True
         return False
 
-    def can_go_to(self, obj, x, y, steps):
+    def can_go_to(self, obj, x, y):
         if self is obj or obj != 0:
             return False
-        if abs(self.pos[0] - x) + abs(self.pos[1] - y) <= steps:
+        if abs(self.pos[0] - x) + abs(self.pos[1] - y) <= 1:
             return True
         return False
 
@@ -78,12 +83,20 @@ class Board:
         self.board = [[0] * width for _ in range(height)]
         self.player = 1
         self.players = [Player(Board), Player(Board)]
+        self.figures = []
 
         self.canmove = True
         self.marker = None
+
         self.marker_fig = None
         self.fig_steps = 0
+        self.direction = [0, 0]
+        self.run_count = 0
+
         self.fig_hits = 0
+        self.hit_count = 0
+        self.enemy = None
+
         self.field_marker = None
         self.variants = []
 
@@ -113,12 +126,12 @@ class Board:
         # Поля
         for i, elem in enumerate(self.players[0].fields):
             if self.field_marker == i:
-                image = load_image("выделение_1.png")
-                image = pygame.transform.scale(image, (self.cell_size * 4, self.cell_size * 2))
+                image = load_image("выделение_1")
+                image = scale(image, (self.cell_size * 4, self.cell_size * 2))
                 screen.blit(image, (cell_size, cell_size * 2 + i * cell_size * 2))
 
-            image = load_image(f'поле_{elem}.png')
-            image = pygame.transform.scale(image, (self.cell_size * 4, self.cell_size * 2))
+            image = load_image(f'поле_{elem}')
+            image = scale(image, (self.cell_size * 4, self.cell_size * 2))
             screen.blit(image, (cell_size, cell_size * 2 + i * cell_size * 2))
 
             text = font.render(str(elem) + '/3', True, (0, 0, 0))
@@ -129,28 +142,26 @@ class Board:
             for j, towerj in enumerate(playeri.towers):
                 name = ''
                 if towerj > 2:
-                    name = "башня_1.png"
+                    name = "башня_1"
                 elif towerj > 0:
-                    name = "башня_2.png"
+                    name = "башня_2"
                 if name != '':
                     image = load_image(name)
-                    image = pygame.transform.scale(image, (self.cell_size, int(self.cell_size * 2.5)))
+                    image = scale(image, (self.cell_size, int(self.cell_size * 2.5)))
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
 
+        # Выделение
         if self.marker is not None:
             x, y = self.marker
             cell = self.board[y][x]
-
-        # Выделение
-        if self.marker is not None:
-            image = load_image("выделение_1.png")
-            image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
+            image = load_image("выделение_1")
+            image = scale(image, (self.cell_size, self.cell_size))
             screen.blit(image, (self.to_real(x, 'x'), self.to_real(y, 'y')))
-            if self.can_place(cell, x, y):
-                a = Figure(self, (x, y), self.player, 'мечник', 1, 2, 1, 1, 2)
-                b = Figure(self, (x, y), self.player, 'копейщик', 1, 2, 2, 1, 4)
-                c = Figure(self, (x, y), self.player, 'всадник', 2, 3, 1, 2, 4)
+            if self.can_place(cell, x, y) and self.marker_fig is None:
+                a = Figure(self, [x, y], self.player, 'мечник', 1, 2, 1, 1, 2)
+                b = Figure(self, [x, y], self.player, 'копейщик', 1, 2, 2, 1, 6)
+                c = Figure(self, [x, y], self.player, 'всадник', 2, 3, 1, 2, 4)
                 good = []
                 for i in [a, b, c]:
                     if self.players[self.player - 1].food - self.players[self.player - 1].spend_food \
@@ -161,7 +172,7 @@ class Board:
                     size = int((3 - len(good)) / 6 * self.cell_size)
                     for i, elem in enumerate(good):
                         image = load_image(elem.get_name())
-                        image = pygame.transform.scale(image, (self.cell_size // 3, self.cell_size // 3))
+                        image = scale(image, (self.cell_size // 3, self.cell_size // 3))
                         screen.blit(image, (self.to_real(x, 'x') + size + i * self.cell_size // 3,
                                             self.to_real(y, 'y')))
                     if x == 0:
@@ -172,53 +183,73 @@ class Board:
                     screen.blit(text, (self.to_real(x, 'x') + (self.cell_size - text.get_width()) // 2,
                                        self.to_real(y, 'y') + text.get_height() // 2))
                     self.variants = good
-            else:
+            elif cell != 0:
                 for i in range(self.height):
                     for j in range(self.width):
                         obj = self.board[i][j]
-                        if self.marker_fig is not None:
-                            steps = self.fig_steps
-                        else:
-                            steps = cell.steps
-                        if cell.can_attack(obj):
-                            image = load_image("выделение_2.png")
-                            image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
+                        if cell.can_attack(obj, j, i):
+                            image = load_image("выделение_2")
+                            image = scale(image, (self.cell_size, self.cell_size))
                             screen.blit(image, (self.to_real(j, 'x'), self.to_real(i, 'y')))
-                        elif cell.can_go_to(obj, j, i, steps):
-                            image = load_image("выделение_3.png")
-                            image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
+                        elif cell.can_go_to(obj, j, i):
+                            image = load_image("выделение_3")
+                            image = scale(image, (self.cell_size, self.cell_size))
                             screen.blit(image, (self.to_real(j, 'x'), self.to_real(i, 'y')))
 
         # Фигуры на поле
-        for i in range(self.height):
-            for j in range(self.width):
-                obj = self.board[i][j]
-                if obj != 0:
-                    image = load_image(obj.get_name())
-                    image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
-                    if obj.color == 2:
+        for obj in self.figures:
+            hit = False
+            if obj == self.marker_fig:
+                if self.direction != [0, 0]:
+                    image = load_image(obj.get_name(self.run_count + 2))
+                    if self.direction[0] == 1 and self.player == 2 or \
+                            self.direction[0] == -1 and self.player == 1:
                         image = flip(image)
-                    screen.blit(image, obj.coords)
-                    hp = obj.hps
-                    for m in range(hp):
-                        image = load_image('сердце.png')
-                        image = pygame.transform.scale(image, (self.cell_size // 6, self.cell_size // 6))
-                        screen.blit(image, (obj.coords[0] + m * self.cell_size // 6,
-                                            obj.coords[1]))
+                elif self.hit_count > 0:
+                    if self.hit_count % 2 > 0:
+                        image = load_image(obj.get_name(4))
+                        hit = True
+                    else:
+                        image = load_image(obj.get_name())
+                    if self.enemy.pos[0] > obj.pos[0] and self.player == 2 or \
+                            self.enemy.pos[0] < obj.pos[0] and self.player == 1:
+                        image = flip(image)
+                else:
+                    image = load_image(obj.get_name())
+            else:
+                image = load_image(obj.get_name())
+            if hit:
+                image = scale(image, (int(self.cell_size * 1.5), self.cell_size))
+            else:
+                image = scale(image, (self.cell_size, self.cell_size))
+            if obj.color == 2:
+                image = flip(image)
+            if hit and self.player == 2:
+                screen.blit(image, (obj.coords[0] - int(cell_size * 0.5), obj.coords[1]))
+            else:
+                screen.blit(image, obj.coords)
+            hp = obj.hps
+            for m in range(hp):
+                image = load_image('сердце')
+                image = scale(image, (self.cell_size // 6, self.cell_size // 6))
+                screen.blit(image, (obj.coords[0] + m * self.cell_size // 6,
+                                    obj.coords[1]))
 
         # Еще выделение
         if self.marker is not None:
+            x, y = self.marker
+            cell = self.board[y][x]
             if not self.can_place(cell, x, y):
                 if self.marker_fig is None:
                     obj = cell
-                    steps_hits = ['шаги.png'] * obj.steps + ['атака.png'] * obj.hits
+                    steps_hits = ['шаги'] * obj.steps + ['атака'] * obj.hits
                 else:
-                    steps_hits = ['шаги.png'] * self.fig_steps + ['атака.png'] * self.fig_hits
+                    steps_hits = ['шаги'] * self.fig_steps + ['атака'] * self.fig_hits
                 for i, elem in enumerate(steps_hits):
                     image = load_image(elem)
-                    image = pygame.transform.scale(image, (self.cell_size // 3, self.cell_size // 3))
-                    screen.blit(image, (self.to_real(x, 'x') + i * self.cell_size // 3,
-                                        self.to_real(y, 'y') + self.cell_size // 3 * 2))
+                    image = scale(image, (self.cell_size // 3, self.cell_size // 3))
+                    screen.blit(image, (cell.coords[0] + i * self.cell_size // 3,
+                                        cell.coords[1] + self.cell_size // 3 * 2))
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -230,9 +261,44 @@ class Board:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
+                if self.marker is not None:
+                    cell = self.board[self.marker[1]][self.marker[0]]
+                    new_cell = self.board[y][x]
+                    if cell != 0 and cell.can_go_to(new_cell, x, y) and cell.color == self.player:
+                        if self.marker_fig is None:
+                            self.marker_fig = cell
+                            self.fig_steps = self.marker_fig.steps
+                            self.fig_hits = self.marker_fig.hits
+                        if self.fig_steps > 0:
+                            self.canmove = False
+                            self.direction = [x - self.marker[0], y - self.marker[1]]
+                            self.marker = None
+                            pygame.time.set_timer(MYEVENTTYPE, SPEED)
+                    elif cell != 0 and new_cell != 0 and cell.can_attack(new_cell, x, y):
+                        if self.marker_fig is None:
+                            self.marker_fig = self.board[self.marker[1]][self.marker[0]]
+                            self.fig_steps = 0
+                            self.fig_hits = self.marker_fig.hits
+                        if self.fig_hits > 0:
+                            self.canmove = False
+                            self.hit_count = 6
+                            self.enemy = new_cell
+                            pygame.time.set_timer(MYEVENTTYPE, SPEED)
                 if self.can_place(self.board[y][x], x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
                     self.marker = x, y
+            elif cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or\
+                    cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1\
+                    and self.marker_fig is not None:
+                x, y = cell_coords
+                x -= 7
+                y -= 1
+                tower = y // 2
+                fig = self.marker_fig
+                if fig is not None and abs(fig.pos[0] - x) == 1 and\
+                        self.players[self.player - 1].towers[tower] > 0:
+                    pass
+
             elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
                 field_coords = (cell_coords[1] - 2) // 2
                 if self.field_marker is None or self.field_marker != field_coords:
@@ -256,23 +322,65 @@ class Board:
 
     def get_key(self, unicode, key):
         if self.canmove:
-            self.board[0][6] = Figure(self, (6, 0), 1, 'мечник', 1, 2, 1, 1, 2)
             if len(self.variants) > 0 and \
                     unicode.ljust(1, '-') in ''.join(list(map(str, range(1, len(self.variants) + 1)))):
                 x, y = self.marker
                 new_figure = self.variants[int(unicode) - 1]
                 self.board[y][x] = new_figure
+                self.figures.append(new_figure)
                 self.players[self.player - 1].spend_food += new_figure.food
                 self.players[self.player - 1].money -= new_figure.money
-                if self.player == 1:
-                    self.player = 2
-                else:
-                    self.player = 1
-                    for i in self.players:
-                        i.money += 1
+                self.change_player()
                 self.variants = []
         if key == 27:
             terminate()
+            
+    def myevent(self):
+        fig = self.marker_fig
+        x, y = self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')
+        if self.direction != [0, 0]:
+            if abs(fig.coords[0] - x) >= cell_size or abs(fig.coords[1] - y) >= cell_size:
+                self.canmove = True
+                self.fig_steps -= 1
+                self.board[fig.pos[1]][fig.pos[0]] = 0
+                fig.pos[0] += self.direction[0]
+                fig.pos[1] += self.direction[1]
+                fig.coords = [self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')]
+                self.run_count = 0
+                self.board[fig.pos[1]][fig.pos[0]] = fig
+                self.direction = [0, 0]
+                self.marker = [fig.pos[0], fig.pos[1]]
+                pygame.time.set_timer(MYEVENTTYPE, 0)
+            else:
+                self.run_count = (self.run_count + 1) % 2
+                fig.coords[0] += self.cell_size // 10 * self.direction[0]
+                fig.coords[1] += self.cell_size // 10 * self.direction[1]
+        else:
+            self.hit_count -= 1
+            if self.hit_count == 0:
+                self.canmove = True
+                self.enemy.hps -= 1
+                if self.enemy.hps == 0:
+                    x, y = self.enemy.pos
+                    self.board[y][x] = 0
+                    self.figures.remove(self.enemy)
+                    self.players[self.enemy.color - 1].spend_food -= self.enemy.food
+                self.fig_steps = 0
+                self.fig_hits -= 1
+                self.marker = [fig.pos[0], fig.pos[1]]
+                pygame.time.set_timer(MYEVENTTYPE, 0)
+        x, y = fig.pos[0], fig.pos[1]
+        enemies = False
+        for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
+            if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
+                    board.board[y + i][x + j] != 0 and \
+                    board.board[y + i][x + j].color != board.player:
+                enemies = True
+                break
+        if board.fig_steps == 0 and (board.fig_hits == 0 or enemies is False):
+            board.marker_fig = None
+            board.change_player()
+            pygame.time.set_timer(MYEVENTTYPE, 0)
 
     def to_real(self, coord, type):
         if type == 'x':
@@ -286,6 +394,15 @@ class Board:
             return True
         return False
 
+    def change_player(self):
+        self.marker = None
+        if self.player == 1:
+            self.player = 2
+        else:
+            self.player = 1
+            for i in self.players:
+                i.money += 1
+
 
 def terminate():
     pygame.quit()
@@ -294,8 +411,8 @@ def terminate():
 
 def start_screen():
     screen.fill((0, 153, 0))
-    image = load_image("стартовый_фон.png")
-    image = pygame.transform.scale(image, size)
+    image = load_image("стартовый_фон")
+    image = scale(image, size)
     screen.blit(image, (0, 0))
 
     while True:
@@ -322,8 +439,8 @@ def info_screen(board):
                 elif page == 2 and cell[0] == 0 and cell[1] == 8:
                     page = 1
         screen.fill((205, 183, 135))
-        image = load_image(f"правила_фон_{page}.png")
-        image = pygame.transform.scale(image, size)
+        image = load_image(f"правила_фон_{page}")
+        image = scale(image, size)
         screen.blit(image, (0, 0))
         pygame.display.flip()
 
@@ -331,11 +448,11 @@ def info_screen(board):
 def end_screen(board):
     screen.fill((0, 153, 0))
     if sum(board.players[0].towers) == 0:
-        name = 'конечный_фон_1.png'
+        name = 'конечный_фон_1'
     else:
-        name = 'конечный_фон_2.png'
+        name = 'конечный_фон_2'
     image = load_image(name)
-    image = pygame.transform.scale(image, size)
+    image = scale(image, size)
     screen.blit(image, (0, 0))
 
     while True:
@@ -347,6 +464,8 @@ def end_screen(board):
 
 
 pygame.init()
+SPEED = 100
+MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
 cell_size = min([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
@@ -363,9 +482,11 @@ while running:
             board.get_click(event.pos)
         if event.type == pygame.KEYDOWN:
             board.get_key(event.unicode, event.key)
+        if event.type == MYEVENTTYPE:
+            board.myevent()
     screen.fill((0, 153, 0))
-    image = load_image("фон.png")
-    image = pygame.transform.scale(image, size)
+    image = load_image("фон")
+    image = scale(image, size)
     screen.blit(image, (0, 0))
     board.render(screen)
     pygame.display.flip()
