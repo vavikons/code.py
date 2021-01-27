@@ -155,20 +155,13 @@ class Board:
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
                 name = ''
-                if towerj > 2:
-                    name = "башня_1"
-                elif towerj > 0:
-                    name = "башня_2"
+                if towerj > 0:
+                    name = f"башня_{towerj}"
                 if name != '':
                     image = load_image(name)
                     image = scale(image, (self.cell_size, int(self.cell_size * 2.5)))
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
-                for m in range(towerj):
-                    image = load_image('сердце')
-                    image = scale(image, (self.cell_size // 6, self.cell_size // 6))
-                    screen.blit(image, (cell_size * 6 + i * cell_size * 9 + m * self.cell_size // 6,
-                                        cell_size + j * cell_size * 2 + cell_size * 6 // 5))
 
         # Выделение
         if self.marker is not None:
@@ -179,8 +172,8 @@ class Board:
             screen.blit(image, (self.to_real(x, 'x'), self.to_real(y, 'y')))
             if self.can_place(cell, x, y) and self.marker_fig is None:
                 a = Figure(self, [x, y], self.player, 'мечник', 1, 2, 1, 1, 2)
-                b = Figure(self, [x, y], self.player, 'копейщик', 1, 2, 2, 1, 6)
-                c = Figure(self, [x, y], self.player, 'всадник', 2, 3, 1, 2, 4)
+                b = Figure(self, [x, y], self.player, 'всадник', 2, 3, 1, 2, 4)
+                c = Figure(self, [x, y], self.player, 'копейщик', 1, 2, 2, 1, 6)
                 good = []
                 for i in [a, b, c]:
                     if self.players[self.player - 1].food - self.players[self.player - 1].spend_food \
@@ -310,19 +303,20 @@ class Board:
                 if self.can_place(self.board[y][x], x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
                     self.marker = x, y
-            elif cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or\
-                    cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1\
-                    and self.marker_fig is None:
+            elif (cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or
+                    cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1)\
+                    and self.marker_fig is None and self.marker is not None:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
                 tower = y // 2
                 cell = self.board[self.marker[1]][self.marker[0]]
-                if cell is not None and abs(cell.pos[0] - x) == 1 and\
+                if cell != 0 and abs(cell.pos[0] - x) == 1 and\
                         self.players[self.player - 1].towers[tower] > 0:
                     if self.player == 1 and cell.pos[0] == 7:
                         self.marker_fig = cell
                         self.canmove = False
+                        self.fig_hits = 1
                         self.hit_count = 24
                         self.tower = [tower, 2]
                         load_sound('удары_башня')
