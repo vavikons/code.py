@@ -97,6 +97,8 @@ class Board:
         self.hit_count = 0
         self.enemy = None
 
+        self.tower = None
+
         self.field_marker = None
         self.variants = []
 
@@ -140,6 +142,11 @@ class Board:
         # Башни
         for i, playeri in enumerate(self.players):
             for j, towerj in enumerate(playeri.towers):
+                if self.tower is not None and self.tower == [j, i + 1]:
+                    image = load_image("выделение_1")
+                    image = scale(image, (self.cell_size, int(self.cell_size * 2)))
+                    screen.blit(image, (cell_size * 6 + i * cell_size * 9,
+                                        cell_size + j * cell_size * 2))
                 name = ''
                 if towerj > 2:
                     name = "башня_1"
@@ -150,6 +157,11 @@ class Board:
                     image = scale(image, (self.cell_size, int(self.cell_size * 2.5)))
                     screen.blit(image, (cell_size * 6 + i * cell_size * 9,
                                         cell_size + j * cell_size * 2))
+                for m in range(towerj):
+                    image = load_image('сердце')
+                    image = scale(image, (self.cell_size // 6, self.cell_size // 6))
+                    screen.blit(image, (cell_size * 6 + i * cell_size * 9 + m * self.cell_size // 6,
+                                        cell_size + j * cell_size * 2 + cell_size * 6 // 5))
 
         # Выделение
         if self.marker is not None:
@@ -211,8 +223,8 @@ class Board:
                         hit = True
                     else:
                         image = load_image(obj.get_name())
-                    if self.enemy.pos[0] > obj.pos[0] and self.player == 2 or \
-                            self.enemy.pos[0] < obj.pos[0] and self.player == 1:
+                    if self.tower is None and (self.enemy.pos[0] > obj.pos[0] and self.player == 2 or
+                       self.enemy.pos[0] < obj.pos[0] and self.player == 1):
                         image = flip(image)
                 else:
                     image = load_image(obj.get_name())
@@ -289,16 +301,27 @@ class Board:
                     self.marker = x, y
             elif cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or\
                     cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1\
-                    and self.marker_fig is not None:
+                    and self.marker_fig is None:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
                 tower = y // 2
-                fig = self.marker_fig
-                if fig is not None and abs(fig.pos[0] - x) == 1 and\
+                cell = self.board[self.marker[1]][self.marker[0]]
+                if cell is not None and abs(cell.pos[0] - x) == 1 and\
                         self.players[self.player - 1].towers[tower] > 0:
-                    pass
-
+                    if self.player == 1 and cell.pos[0] == 7:
+                        self.marker_fig = cell
+                        self.canmove = False
+                        self.hit_count = 6
+                        self.tower = [tower, 2]
+                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
+                    elif self.player == 2 and cell.pos[0] == 0:
+                        self.marker_fig = cell
+                        self.canmove = False
+                        self.fig_hits = 1
+                        self.hit_count = 6
+                        self.tower = [tower, 1]
+                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
             elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
                 field_coords = (cell_coords[1] - 2) // 2
                 if self.field_marker is None or self.field_marker != field_coords:
@@ -311,6 +334,19 @@ class Board:
                     self.field_marker = None
                 else:
                     self.field_marker = None
+            elif cell_coords[0] == 5 and cell_coords[1] == 1:
+                self.marker_fig = None
+                self.fig_steps = 0
+                self.direction = [0, 0]
+                self.run_count = 0
+
+                self.fig_hits = 0
+                self.hit_count = 0
+                self.enemy = None
+
+                self.tower = None
+                self.change_player()
+                pygame.time.set_timer(MYEVENTTYPE, 0)
             elif cell_coords[0] == 0 and cell_coords[1] == 1:
                 info_screen(board)
 
@@ -334,7 +370,7 @@ class Board:
                 self.variants = []
         if key == 27:
             terminate()
-            
+
     def myevent(self):
         if self.marker_fig is not None:
             fig = self.marker_fig
@@ -356,7 +392,7 @@ class Board:
                     self.run_count = (self.run_count + 1) % 2
                     fig.coords[0] += self.cell_size // 10 * self.direction[0]
                     fig.coords[1] += self.cell_size // 10 * self.direction[1]
-            else:
+            elif self.enemy is not None:
                 self.hit_count -= 1
                 if self.hit_count == 0:
                     self.canmove = True
@@ -370,24 +406,37 @@ class Board:
                     self.fig_hits -= 1
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
-            x, y = fig.pos[0], fig.pos[1]
-            enemies = False
-            for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
-                if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
-                        board.board[y + i][x + j] != 0 and \
-                        board.board[y + i][x + j].color != board.player:
+            elif self.tower is not None:
+                self.hit_count -= 1
+                if self.hit_count == 0:
+                    self.canmove = True
+                    self.players[self.player - 2].towers[self.tower[0]] -= 1
+                    self.fig_steps = 0
+                    self.fig_hits = 0
+                    self.tower = None
+                    self.marker = [fig.pos[0], fig.pos[1]]
+                    pygame.time.set_timer(MYEVENTTYPE, 0)
+            if self.tower is None:
+                x, y = fig.pos[0], fig.pos[1]
+                enemies = False
+                for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
+                    if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
+                            self.board[y + i][x + j] != 0 and \
+                            self.board[y + i][x + j].color != self.player:
+                        enemies = True
+                        break
+                if self.tower is not None:
                     enemies = True
-                    break
-            if board.fig_steps == 0 and (board.fig_hits == 0 or enemies is False):
-                board.marker_fig = None
-                board.change_player()
-                pygame.time.set_timer(MYEVENTTYPE, 0)
+                if self.fig_steps == 0 and (self.fig_hits == 0 or enemies is False):
+                    self.marker_fig = None
+                    self.change_player()
+                    pygame.time.set_timer(MYEVENTTYPE, 0)
 
     def to_real(self, coord, type):
         if type == 'x':
-            return coord * board.cell_size + board.left
+            return coord * self.cell_size + self.left
         else:
-            return coord * board.cell_size + board.top
+            return coord * self.cell_size + self.top
 
     def can_place(self, cell, x, y):
         if cell == 0 and (x == 0 and self.player == 1 or x == 7 and self.player == 2)\
@@ -488,7 +537,9 @@ def main():
 
 
 pygame.init()
-SPEED = 100
+pygame.mixer.music.load('data/фон.mid')
+pygame.mixer.music.play()
+SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
 cell_size = min([infoObject.current_w // 16, infoObject.current_h // 9])
