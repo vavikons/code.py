@@ -4,13 +4,20 @@ import sys
 
 
 def load_image(name, extension='.png'):
-    fullname = os.path.join('data', name)
+    fullname = os.path.join('pictures', name)
     fullname += extension
     if not os.path.isfile(fullname):
         fullname = os.path.join('data', 'not_found.png')
     image = pygame.image.load(fullname)
     image = image.convert_alpha()
     return image
+
+
+def load_sound(name, extension='.mp3'):
+    fullname = os.path.join('sound', name)
+    fullname += extension
+    sound = pygame.mixer.Sound(fullname)
+    sound.play()
 
 
 def scale(image, size):
@@ -195,6 +202,8 @@ class Board:
                     screen.blit(text, (self.to_real(x, 'x') + (self.cell_size - text.get_width()) // 2,
                                        self.to_real(y, 'y') + text.get_height() // 2))
                     self.variants = good
+                else:
+                    self.marker = None
             elif cell != 0:
                 for i in range(self.height):
                     for j in range(self.width):
@@ -285,6 +294,7 @@ class Board:
                             self.canmove = False
                             self.direction = [x - self.marker[0], y - self.marker[1]]
                             self.marker = None
+                            load_sound('шаги')
                             pygame.time.set_timer(MYEVENTTYPE, SPEED)
                     elif cell != 0 and new_cell != 0 and cell.can_attack(new_cell, x, y):
                         if self.marker_fig is None:
@@ -293,8 +303,9 @@ class Board:
                             self.fig_hits = self.marker_fig.hits
                         if self.fig_hits > 0:
                             self.canmove = False
-                            self.hit_count = 6
+                            self.hit_count = 24
                             self.enemy = new_cell
+                            load_sound('удары')
                             pygame.time.set_timer(MYEVENTTYPE, SPEED)
                 if self.can_place(self.board[y][x], x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
@@ -312,15 +323,17 @@ class Board:
                     if self.player == 1 and cell.pos[0] == 7:
                         self.marker_fig = cell
                         self.canmove = False
-                        self.hit_count = 6
+                        self.hit_count = 24
                         self.tower = [tower, 2]
+                        load_sound('удары_башня')
                         pygame.time.set_timer(MYEVENTTYPE, SPEED)
                     elif self.player == 2 and cell.pos[0] == 0:
                         self.marker_fig = cell
                         self.canmove = False
                         self.fig_hits = 1
-                        self.hit_count = 6
+                        self.hit_count = 24
                         self.tower = [tower, 1]
+                        load_sound('удары_башня')
                         pygame.time.set_timer(MYEVENTTYPE, SPEED)
             elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
                 field_coords = (cell_coords[1] - 2) // 2
@@ -448,6 +461,8 @@ class Board:
         self.marker = None
         if self.player == 1:
             self.player = 2
+            if AI:
+                print('ИИ в разработке')
         else:
             self.player = 1
             for i in self.players:
@@ -537,8 +552,9 @@ def main():
 
 
 pygame.init()
-pygame.mixer.music.load('data/фон.mid')
+pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play()
+AI = False
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
