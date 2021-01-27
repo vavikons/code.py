@@ -336,51 +336,52 @@ class Board:
             terminate()
             
     def myevent(self):
-        fig = self.marker_fig
-        x, y = self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')
-        if self.direction != [0, 0]:
-            if abs(fig.coords[0] - x) >= cell_size or abs(fig.coords[1] - y) >= cell_size:
-                self.canmove = True
-                self.fig_steps -= 1
-                self.board[fig.pos[1]][fig.pos[0]] = 0
-                fig.pos[0] += self.direction[0]
-                fig.pos[1] += self.direction[1]
-                fig.coords = [self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')]
-                self.run_count = 0
-                self.board[fig.pos[1]][fig.pos[0]] = fig
-                self.direction = [0, 0]
-                self.marker = [fig.pos[0], fig.pos[1]]
-                pygame.time.set_timer(MYEVENTTYPE, 0)
+        if self.marker_fig is not None:
+            fig = self.marker_fig
+            x, y = self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')
+            if self.direction != [0, 0]:
+                if abs(fig.coords[0] - x) >= cell_size or abs(fig.coords[1] - y) >= cell_size:
+                    self.canmove = True
+                    self.fig_steps -= 1
+                    self.board[fig.pos[1]][fig.pos[0]] = 0
+                    fig.pos[0] += self.direction[0]
+                    fig.pos[1] += self.direction[1]
+                    fig.coords = [self.to_real(fig.pos[0], 'x'), self.to_real(fig.pos[1], 'y')]
+                    self.run_count = 0
+                    self.board[fig.pos[1]][fig.pos[0]] = fig
+                    self.direction = [0, 0]
+                    self.marker = [fig.pos[0], fig.pos[1]]
+                    pygame.time.set_timer(MYEVENTTYPE, 0)
+                else:
+                    self.run_count = (self.run_count + 1) % 2
+                    fig.coords[0] += self.cell_size // 10 * self.direction[0]
+                    fig.coords[1] += self.cell_size // 10 * self.direction[1]
             else:
-                self.run_count = (self.run_count + 1) % 2
-                fig.coords[0] += self.cell_size // 10 * self.direction[0]
-                fig.coords[1] += self.cell_size // 10 * self.direction[1]
-        else:
-            self.hit_count -= 1
-            if self.hit_count == 0:
-                self.canmove = True
-                self.enemy.hps -= 1
-                if self.enemy.hps == 0:
-                    x, y = self.enemy.pos
-                    self.board[y][x] = 0
-                    self.figures.remove(self.enemy)
-                    self.players[self.enemy.color - 1].spend_food -= self.enemy.food
-                self.fig_steps = 0
-                self.fig_hits -= 1
-                self.marker = [fig.pos[0], fig.pos[1]]
+                self.hit_count -= 1
+                if self.hit_count == 0:
+                    self.canmove = True
+                    self.enemy.hps -= 1
+                    if self.enemy.hps == 0:
+                        x, y = self.enemy.pos
+                        self.board[y][x] = 0
+                        self.figures.remove(self.enemy)
+                        self.players[self.enemy.color - 1].spend_food -= self.enemy.food
+                    self.fig_steps = 0
+                    self.fig_hits -= 1
+                    self.marker = [fig.pos[0], fig.pos[1]]
+                    pygame.time.set_timer(MYEVENTTYPE, 0)
+            x, y = fig.pos[0], fig.pos[1]
+            enemies = False
+            for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
+                if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
+                        board.board[y + i][x + j] != 0 and \
+                        board.board[y + i][x + j].color != board.player:
+                    enemies = True
+                    break
+            if board.fig_steps == 0 and (board.fig_hits == 0 or enemies is False):
+                board.marker_fig = None
+                board.change_player()
                 pygame.time.set_timer(MYEVENTTYPE, 0)
-        x, y = fig.pos[0], fig.pos[1]
-        enemies = False
-        for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
-            if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
-                    board.board[y + i][x + j] != 0 and \
-                    board.board[y + i][x + j].color != board.player:
-                enemies = True
-                break
-        if board.fig_steps == 0 and (board.fig_hits == 0 or enemies is False):
-            board.marker_fig = None
-            board.change_player()
-            pygame.time.set_timer(MYEVENTTYPE, 0)
 
     def to_real(self, coord, type):
         if type == 'x':
@@ -463,6 +464,29 @@ def end_screen(board):
         pygame.display.flip()
 
 
+def main():
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                board.get_click(event.pos)
+            if event.type == pygame.KEYDOWN:
+                board.get_key(event.unicode, event.key)
+            if event.type == MYEVENTTYPE:
+                board.myevent()
+        screen.fill((0, 153, 0))
+        image = load_image("фон")
+        image = scale(image, size)
+        screen.blit(image, (0, 0))
+        board.render(screen)
+        pygame.display.flip()
+        if sum(board.players[0].towers) == 0 or \
+                sum(board.players[1].towers) == 0:
+            end_screen(board)
+            break
+
+
 pygame.init()
 SPEED = 100
 MYEVENTTYPE = pygame.USEREVENT + 1
@@ -473,25 +497,5 @@ screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 start_screen()
 board = Board(8, 8, cell_size)
 
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            board.get_click(event.pos)
-        if event.type == pygame.KEYDOWN:
-            board.get_key(event.unicode, event.key)
-        if event.type == MYEVENTTYPE:
-            board.myevent()
-    screen.fill((0, 153, 0))
-    image = load_image("фон")
-    image = scale(image, size)
-    screen.blit(image, (0, 0))
-    board.render(screen)
-    pygame.display.flip()
-    if sum(board.players[0].towers) == 0 or \
-            sum(board.players[1].towers) == 0:
-        end_screen(board)
-        running = False
+main()
 pygame.quit()
