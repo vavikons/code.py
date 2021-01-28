@@ -142,7 +142,10 @@ class Board:
         text = font.render(str(self.players[1].money), True, (0, 0, 0))
         screen.blit(text, (self.cell_size * 9 + (self.cell_size - text.get_width()) // 2,
                            (self.cell_size - text.get_height()) // 2))
-        text = font.render(str(self.players[1].spend_food), True, (0, 0, 0))
+        if SHOW_AI_FIELDS:
+            text = font.render(str(self.players[1].get_food()), True, (0, 0, 0))
+        else:
+            text = font.render(str(self.players[1].spend_food), True, (0, 0, 0))
         screen.blit(text, (self.cell_size * 11 + (self.cell_size - text.get_width()) // 2,
                            (self.cell_size - text.get_height()) // 2))
 
@@ -345,9 +348,7 @@ class Board:
                     self.field_marker = field_coords
                 elif self.field_marker == field_coords and self.players[0].money >= 10\
                         and self.players[0].fields[field_coords] < 3:
-                    self.players[0].fields[field_coords] += 1
-                    self.players[0].food = sum(self.players[0].fields) * 2
-                    self.players[0].money -= 10
+                    self.upgrade_fields(1, field_coords)
                     self.field_marker = None
                 else:
                     self.field_marker = None
@@ -436,17 +437,8 @@ class Board:
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
             if self.tower is None:
-                x, y = fig.pos[0], fig.pos[1]
-                enemies = False
-                for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
-                    if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
-                            self.board[y + i][x + j] != 0 and \
-                            self.board[y + i][x + j].color != self.player:
-                        enemies = True
-                        break
-                if self.tower is not None:
-                    enemies = True
-                if self.fig_steps == 0 and (self.fig_hits == 0 or enemies is False):
+                enemies = self.enemies(fig)
+                if self.fig_steps == 0 and (self.fig_hits == 0 or len(enemies) == 0 or self.tower is not None):
                     self.marker_fig = None
                     self.change_player()
                     pygame.time.set_timer(MYEVENTTYPE, 0)
@@ -471,8 +463,20 @@ class Board:
                     and self.players[self.player - 1].money >= i.money:
                 self.variants.append(i.copy(self.player))
 
-    def upgrade_fields(self, player, cell_coords):
-        pass
+    def upgrade_fields(self, player, field_coords):
+        self.players[player - 1].fields[field_coords] += 1
+        self.players[player - 1].food = sum(self.players[player - 1].fields) * 2
+        self.players[player - 1].money -= 10
+
+    def enemies(self, obj):
+        x, y = obj.pos[0], obj.pos[1]
+        enemies_lst = []
+        for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
+            if 0 <= y + i <= 7 and 0 <= x + j <= 7 and \
+                    self.board[y + i][x + j] != 0 and \
+                    self.board[y + i][x + j].color != self.player:
+                enemies_lst.append(self.board[y + i][x + j])
+        return enemies_lst
 
     def change_player(self):
         self.marker = None
@@ -495,17 +499,38 @@ class Board:
                 #                                 fig.hits * fig.steps
                 # print(score)
                 ai = self.players[1]
-                ai_figures = filter(lambda x: x.color == 2, self.figures)
+                ai_figures = list(filter(lambda x: x.color == 2, self.figures))
                 place_vars = []
                 for i in range(8):
                     if self.can_place(7, i):
                         place_vars.append(i)
                 self.do_variants()
+                field_vars = []
+                for i in range(3):
+                    if ai.fields[i] < 3:
+                        field_vars.append(i)
                 if ai.spend_food < ai.food and len(place_vars) > 0 and len(self.variants) > 0:
                     self.on_click((14, choice(place_vars) + 1))
                     self.get_key(str(choice(range(len(self.variants))) + 1), 0)
-                elif ai.money >= 10:
-                    pass
+                elif ai.money >= 10 and len(field_vars) > 0:
+                    self.upgrade_fields(2, choice(field_vars))
+                elif len(ai_figures) > 0:
+                    fig = choice(ai_figures)
+                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                    enemies = self.enemies(fig)
+                    if len(enemies) > 0:
+                        enemy = choice(enemies)
+                        self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                    else:
+                        go_vars = []
+                        for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
+                            if 0 <= fig.pos[1] + i <= 7 and 0 <= fig.pos[0] + j <= 7 and \
+                                    self.board[fig.pos[1] + i][fig.pos[0] + j] == 0:
+                                go_vars.append([fig.pos[0] + j, fig.pos[1] + i])
+                        if len(go_vars) > 0:
+                            go_pos = choice(go_vars)
+                            self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+
         else:
             self.player = 1
             for i in self.players:
@@ -597,7 +622,8 @@ def main():
 pygame.init()
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play()
-AI = True
+AI = False
+SHOW_AI_FIELDS = True
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
