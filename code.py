@@ -1,13 +1,14 @@
 import pygame
 import os
 import sys
+from random import choice
 
 
 def load_image(name, extension='.png'):
     fullname = os.path.join('pictures', name)
     fullname += extension
     if not os.path.isfile(fullname):
-        fullname = os.path.join('data', 'not_found.png')
+        fullname = os.path.join('pictures', 'not_found.png')
     image = pygame.image.load(fullname)
     image = image.convert_alpha()
     return image
@@ -43,18 +44,22 @@ class Player:
 
 
 class Figure:
-    def __init__(self, board, pos, color, name, food, hps, hits, steps, money):
+    def __init__(self, board, name, food, hps, hits, steps, money):
         self.board = board
-        self.color = color
         self.name = name
+        self.color = 0
         self.food = food
         self.hps = hps
         self.hits = hits
         self.steps = steps
         self.money = money
         self.name = name
-        self.set_pos(pos)
         self.moving = False
+
+    def copy(self, color):
+        res = Figure(self, self.name, self.food, self.hps, self.hits, self.steps, self.money)
+        res.color = self.board.player
+        return res
 
     def get_name(self, num=1):
         return self.name + '_' + str(self.color) + '_' + str(num) + ''
@@ -82,7 +87,6 @@ class Figure:
 
     def set_pos(self, pos):
         self.pos = pos
-        print(pos)
         self.coords = [board.to_real(pos[0], 'x'), board.to_real(pos[1], 'y')]
 
 
@@ -115,6 +119,9 @@ class Board:
 
         self.field_marker = None
         self.variants = []
+        self.personages = [Figure(self, 'мечник', 1, 2, 1, 1, 2),
+                           Figure(self, 'всадник', 2, 3, 1, 2, 4),
+                           Figure(self, 'копейщик', 1, 2, 2, 1, 6),]
 
     def render(self, screen):
         # Выделение ходящего игрока
@@ -177,31 +184,24 @@ class Board:
             image = load_image("выделение_1")
             image = scale(image, (self.cell_size, self.cell_size))
             screen.blit(image, (self.to_real(x, 'x'), self.to_real(y, 'y')))
-            if self.can_place(cell, x, y) and self.marker_fig is None:
-                a = Figure(self, [x, y], self.player, 'мечник', 1, 2, 1, 1, 2)
-                b = Figure(self, [x, y], self.player, 'всадник', 2, 3, 1, 2, 4)
-                c = Figure(self, [x, y], self.player, 'копейщик', 1, 2, 2, 1, 6)
-                good = []
-                for i in [a, b, c]:
-                    if self.players[self.player - 1].food - self.players[self.player - 1].spend_food \
-                           >= i.food \
-                            and self.players[self.player - 1].money >= i.money:
-                        good.append(i)
-                if len(good) > 0:
-                    size = int((3 - len(good)) / 6 * self.cell_size)
-                    for i, elem in enumerate(good):
+            if self.can_place(x, y) and self.marker_fig is None:
+                self.do_variants()
+                if len(self.variants) > 0:
+                    len_p = len(self.personages)
+                    size = int((len_p - len(self.variants)) / (len_p * 2) * self.cell_size)
+                    for i, elem in enumerate(self.variants):
                         image = load_image(elem.get_name())
-                        image = scale(image, (self.cell_size // 3, self.cell_size // 3))
-                        screen.blit(image, (self.to_real(x, 'x') + size + i * self.cell_size // 3,
+                        image = scale(image, (self.cell_size // len_p, self.cell_size // len_p))
+                        screen.blit(image, (self.to_real(x, 'x') + size + i * self.cell_size // len_p,
                                             self.to_real(y, 'y')))
                     if x == 0:
                         color = (0, 0, 255)
                     else:
                         color = (255, 0, 0)
-                    text = font.render(''.join(list(map(str, range(1, len(good) + 1)))), True, color)
+                    text = font.render(''.join(list(map(str, range(1, len(self.variants) + 1)))), True, color)
                     screen.blit(text, (self.to_real(x, 'x') + (self.cell_size - text.get_width()) // 2,
                                        self.to_real(y, 'y') + text.get_height() // 2))
-                    self.variants = good
+                    self.variants = self.variants
                 else:
                     self.marker = None
             elif cell != 0:
@@ -263,7 +263,7 @@ class Board:
         if self.marker is not None:
             x, y = self.marker
             cell = self.board[y][x]
-            if not self.can_place(cell, x, y):
+            if not self.can_place(x, y):
                 if self.marker_fig is None:
                     obj = cell
                     steps_hits = ['шаги'] * obj.steps + ['атака'] * obj.hits
@@ -280,7 +280,6 @@ class Board:
         self.on_click(cell)
 
     def on_click(self, cell_coords):
-        print(cell_coords)
         if cell_coords is not None and self.canmove:
             if 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
                 x, y = cell_coords
@@ -311,7 +310,7 @@ class Board:
                             self.enemy = new_cell
                             load_sound('удары')
                             pygame.time.set_timer(MYEVENTTYPE, SPEED)
-                if self.can_place(self.board[y][x], x, y) or self.board[y][x] != 0 and \
+                if self.can_place(x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
                     self.marker = x, y
             elif (cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or
@@ -458,11 +457,22 @@ class Board:
         else:
             return coord * self.cell_size + self.top
 
-    def can_place(self, cell, x, y):
-        if cell == 0 and (x == 0 and self.player == 1 or x == 7 and self.player == 2)\
+    def can_place(self, x, y):
+        if self.board[y][x] == 0 and (x == 0 and self.player == 1 or x == 7 and self.player == 2)\
                 and self.players[self.player - 1].towers[y // 2] > 0:
             return True
         return False
+    
+    def do_variants(self):
+        self.variants = []
+        for i in self.personages:
+            if self.players[self.player - 1].food - self.players[self.player - 1].spend_food \
+                    >= i.food \
+                    and self.players[self.player - 1].money >= i.money:
+                self.variants.append(i.copy(self.player))
+
+    def upgrade_fields(self, player, cell_coords):
+        pass
 
     def change_player(self):
         self.marker = None
@@ -470,20 +480,32 @@ class Board:
             self.player = 2
             if AI:
                 print('ИИ в разработке')
-                score = [0, 0]
-                if len(self.figures) == 1:
-                    self.on_click((14, self.figures[0].pos[1] + 1))
-                    # ['1', 49]
-                    # ['2', 50]
-                    # ['3', 51]
-                    self.get_key('1', 49)
-                else:
-                    for fig in self.figures:
-                        score[fig.color - 1] += fig.pos[0] * \
-                                                min(list(map(lambda x: fig.distance(x),
-                                                             filter(lambda x: x.color != fig.color, self.figures)))) * \
-                                                fig.hits * fig.steps
-                print(score)
+                # score = [0, 0]
+                # if len(self.figures) == 1:
+                #     self.on_click((14, self.figures[0].pos[1] + 1))
+                #     # ['1', 49]
+                #     # ['2', 50]
+                #     # ['3', 51]
+                #     self.get_key('1', 49)
+                # else:
+                #     for fig in self.figures:
+                #         score[fig.color - 1] += fig.pos[0] * \
+                #                                 min(list(map(lambda x: fig.distance(x),
+                #                                              filter(lambda x: x.color != fig.color, self.figures)))) * \
+                #                                 fig.hits * fig.steps
+                # print(score)
+                ai = self.players[1]
+                ai_figures = filter(lambda x: x.color == 2, self.figures)
+                place_vars = []
+                for i in range(8):
+                    if self.can_place(7, i):
+                        place_vars.append(i)
+                self.do_variants()
+                if ai.spend_food < ai.food and len(place_vars) > 0 and len(self.variants) > 0:
+                    self.on_click((14, choice(place_vars) + 1))
+                    self.get_key(str(choice(range(len(self.variants))) + 1), 0)
+                elif ai.money >= 10:
+                    pass
         else:
             self.player = 1
             for i in self.players:
@@ -575,7 +597,7 @@ def main():
 pygame.init()
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play()
-AI = False
+AI = True
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
