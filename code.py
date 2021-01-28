@@ -18,7 +18,9 @@ def load_sound(name, extension='.mp3'):
     fullname = os.path.join('sound', name)
     fullname += extension
     sound = pygame.mixer.Sound(fullname)
-    sound.play()
+    sound.set_volume(VOLUME)
+    if not SOUND_OFF:
+        sound.play()
 
 
 def scale(image, size):
@@ -149,6 +151,14 @@ class Board:
         screen.blit(text, (self.cell_size * 11 + (self.cell_size - text.get_width()) // 2,
                            (self.cell_size - text.get_height()) // 2))
 
+        # громкость
+        if SOUND_OFF:
+            text = font.render('x', True, (255, 0, 0))
+        else:
+            text = font.render(str(int(VOLUME * 10)) + '/10', True, (255, 0, 0))
+        screen.blit(text, (self.cell_size * 4 + (self.cell_size - text.get_width()) // 2,
+                           self.cell_size))
+
         # Поля
         for i, elem in enumerate(self.players[0].fields):
             if self.field_marker == i:
@@ -268,8 +278,7 @@ class Board:
             cell = self.board[y][x]
             if not self.can_place(x, y):
                 if self.marker_fig is None:
-                    obj = cell
-                    steps_hits = ['шаги'] * obj.steps + ['атака'] * obj.hits
+                    steps_hits = ['шаги'] * cell.steps + ['атака'] * cell.hits
                 else:
                     steps_hits = ['шаги'] * self.fig_steps + ['атака'] * self.fig_hits
                 for i, elem in enumerate(steps_hits):
@@ -283,11 +292,80 @@ class Board:
         self.on_click(cell)
 
     def on_click(self, cell_coords):
+        global SOUND_OFF
+        global VOLUME
         if cell_coords is not None and self.canmove:
-            if 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
+            if cell_coords[0] == 0 and cell_coords[1] == 1:
+                info_screen(board)
+            elif cell_coords[0] == 1 and cell_coords[1] == 1:
+                if SOUND_OFF:
+                    SOUND_OFF = False
+                    pygame.mixer.music.unpause()
+                else:
+                    SOUND_OFF = True
+                    pygame.mixer.music.pause()
+            elif cell_coords[0] == 2 and cell_coords[1] == 1:
+                if not SOUND_OFF and VOLUME > 0.2:
+                    VOLUME -= 0.1
+                    pygame.mixer.music.set_volume(VOLUME)
+            elif cell_coords[0] == 3 and cell_coords[1] == 1:
+                if not SOUND_OFF and VOLUME < 1:
+                    VOLUME += 0.1
+                    pygame.mixer.music.set_volume(VOLUME)
+            elif cell_coords[0] == 5 and cell_coords[1] == 1 and (self.player == 1 or not AI):
+                self.marker_fig = None
+                self.fig_steps = 0
+                self.direction = [0, 0]
+                self.run_count = 0
+
+                self.fig_hits = 0
+                self.hit_count = 0
+                self.enemy = None
+
+                self.tower = None
+                self.change_player()
+                pygame.time.set_timer(MYEVENTTYPE, 0)
+            elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
+                field_coords = (cell_coords[1] - 2) // 2
+                if self.field_marker is None or self.field_marker != field_coords:
+                    self.field_marker = field_coords
+                elif self.field_marker == field_coords and self.players[0].money >= 10\
+                        and self.players[0].fields[field_coords] < 3:
+                    self.upgrade_fields(1, field_coords)
+                    self.field_marker = None
+                else:
+                    self.field_marker = None
+            elif (cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or
+                    cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1)\
+                    and self.marker_fig is None and self.marker is not None:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
+                tower = y // 2
+                cell = self.board[self.marker[1]][self.marker[0]]
+                if cell != 0 and abs(cell.pos[0] - x) == 1 and\
+                        self.players[self.player - 1].towers[tower] > 0:
+                    if self.player == 1 and cell.pos[0] == 7:
+                        self.marker_fig = cell
+                        self.canmove = False
+                        self.fig_hits = 1
+                        self.hit_count = 24
+                        self.tower = [tower, 2]
+                        load_sound('удары_башня')
+                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
+                    elif self.player == 2 and cell.pos[0] == 0:
+                        self.marker_fig = cell
+                        self.canmove = False
+                        self.fig_hits = 1
+                        self.hit_count = 24
+                        self.tower = [tower, 1]
+                        load_sound('удары_башня')
+                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
+            elif 6 < cell_coords[0] < 15 and 0 < cell_coords[1]:
+                x, y = cell_coords
+                x -= 7
+                y -= 1
+                print(x, y)
                 if self.marker is not None:
                     cell = self.board[self.marker[1]][self.marker[0]]
                     new_cell = self.board[y][x]
@@ -316,57 +394,6 @@ class Board:
                 if self.can_place(x, y) or self.board[y][x] != 0 and \
                         self.board[y][x].color == self.player:
                     self.marker = x, y
-            elif (cell_coords[0] == 6 and 0 < cell_coords[1] and self.player == 2 or
-                    cell_coords[0] == 15 and 0 < cell_coords[1] and self.player == 1)\
-                    and self.marker_fig is None and self.marker is not None:
-                x, y = cell_coords
-                x -= 7
-                y -= 1
-                tower = y // 2
-                cell = self.board[self.marker[1]][self.marker[0]]
-                if cell != 0 and abs(cell.pos[0] - x) == 1 and\
-                        self.players[self.player - 1].towers[tower] > 0:
-                    if self.player == 1 and cell.pos[0] == 7:
-                        self.marker_fig = cell
-                        self.canmove = False
-                        self.fig_hits = 1
-                        self.hit_count = 24
-                        self.tower = [tower, 2]
-                        load_sound('удары_башня')
-                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
-                    elif self.player == 2 and cell.pos[0] == 0:
-                        self.marker_fig = cell
-                        self.canmove = False
-                        self.fig_hits = 1
-                        self.hit_count = 24
-                        self.tower = [tower, 1]
-                        load_sound('удары_башня')
-                        pygame.time.set_timer(MYEVENTTYPE, SPEED)
-            elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
-                field_coords = (cell_coords[1] - 2) // 2
-                if self.field_marker is None or self.field_marker != field_coords:
-                    self.field_marker = field_coords
-                elif self.field_marker == field_coords and self.players[0].money >= 10\
-                        and self.players[0].fields[field_coords] < 3:
-                    self.upgrade_fields(1, field_coords)
-                    self.field_marker = None
-                else:
-                    self.field_marker = None
-            elif cell_coords[0] == 5 and cell_coords[1] == 1 and (self.player == 1 or not AI):
-                self.marker_fig = None
-                self.fig_steps = 0
-                self.direction = [0, 0]
-                self.run_count = 0
-
-                self.fig_hits = 0
-                self.hit_count = 0
-                self.enemy = None
-
-                self.tower = None
-                self.change_player()
-                pygame.time.set_timer(MYEVENTTYPE, 0)
-            elif cell_coords[0] == 0 and cell_coords[1] == 1:
-                info_screen(board)
 
     def get_cell(self, mouse_pos):
         x, y = mouse_pos
@@ -484,20 +511,6 @@ class Board:
             self.player = 2
             if AI:
                 print('ИИ в разработке')
-                # score = [0, 0]
-                # if len(self.figures) == 1:
-                #     self.on_click((14, self.figures[0].pos[1] + 1))
-                #     # ['1', 49]
-                #     # ['2', 50]
-                #     # ['3', 51]
-                #     self.get_key('1', 49)
-                # else:
-                #     for fig in self.figures:
-                #         score[fig.color - 1] += fig.pos[0] * \
-                #                                 min(list(map(lambda x: fig.distance(x),
-                #                                              filter(lambda x: x.color != fig.color, self.figures)))) * \
-                #                                 fig.hits * fig.steps
-                # print(score)
                 ai = self.players[1]
                 ai_figures = list(filter(lambda x: x.color == 2, self.figures))
                 place_vars = []
@@ -509,28 +522,49 @@ class Board:
                 for i in range(3):
                     if ai.fields[i] < 3:
                         field_vars.append(i)
-                if ai.spend_food < ai.food and len(place_vars) > 0 and len(self.variants) > 0:
+                if len(place_vars) > 0 and len(self.variants) > 0:
                     self.on_click((14, choice(place_vars) + 1))
                     self.get_key(str(choice(range(len(self.variants))) + 1), 0)
                 elif ai.money >= 10 and len(field_vars) > 0:
                     self.upgrade_fields(2, choice(field_vars))
                 elif len(ai_figures) > 0:
                     fig = choice(ai_figures)
-                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    enemies = self.enemies(fig)
-                    if len(enemies) > 0:
-                        enemy = choice(enemies)
-                        self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
-                    else:
-                        go_vars = []
-                        for i, j in [[-1, 0], [0, -1], [1, 0], [0, 1]]:
-                            if 0 <= fig.pos[1] + i <= 7 and 0 <= fig.pos[0] + j <= 7 and \
-                                    self.board[fig.pos[1] + i][fig.pos[0] + j] == 0:
-                                go_vars.append([fig.pos[0] + j, fig.pos[1] + i])
-                        if len(go_vars) > 0:
-                            go_pos = choice(go_vars)
-                            self.on_click((go_pos[0] + 7, go_pos[1] + 1))
-
+                    hited = False
+                    for i in range(fig.hits):
+                        enemies = self.enemies(fig)
+                        if len(enemies) > 0:
+                            self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                            print(fig.name)
+                            enemy = choice(enemies)
+                            self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                            hited = True
+                    if not hited:
+                        for n in range(fig.steps):
+                            self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                            print(fig.name)
+                            go_vars = []
+                            for x, y in [[-1, 0], [0, -1], [1, 0]]:
+                                xi, yi = fig.pos[0] + x, fig.pos[1] + y
+                                if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
+                                    go_vars.append([xi, yi])
+                            if len(go_vars) > 0:
+                                go_pos = choice(go_vars)
+                                self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+                            hited = False
+                            for m in range(fig.hits):
+                                enemies = self.enemies(fig)
+                                if len(enemies) > 0:
+                                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                                    print(fig.name)
+                                    enemy = choice(enemies)
+                                    self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                                    hited = True
+                            if hited:
+                                break
+                print('Продолжаем разработку')
+                self.player = 1
+                for i in self.players:
+                    i.money += 1
         else:
             self.player = 1
             for i in self.players:
@@ -621,8 +655,10 @@ def main():
 
 pygame.init()
 pygame.mixer.music.load('sound/фон.mid')
-pygame.mixer.music.play()
-AI = False
+pygame.mixer.music.play(-1)
+VOLUME = 0.5
+SOUND_OFF = False
+AI = True
 SHOW_AI_FIELDS = True
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
