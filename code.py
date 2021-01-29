@@ -436,7 +436,7 @@ class Board:
                     self.direction = [0, 0]
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
-                    if AI:
+                    if AI and self.player == 2:
                         self.change_player(fig)
                 else:
                     self.run_count = (self.run_count + 1) % 2
@@ -456,7 +456,7 @@ class Board:
                     self.fig_hits -= 1
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
-                    if AI:
+                    if AI and self.player == 2:
                         self.change_player(fig)
             elif self.tower is not None:
                 self.hit_count -= 1
@@ -468,15 +468,15 @@ class Board:
                     self.tower = None
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
-                    if AI:
+                    if AI and self.player == 2:
                         self.change_player(fig)
             if self.tower is None:
                 enemies = self.enemies(fig)
                 if self.fig_steps == 0 and (self.fig_hits == 0 or len(enemies) == 0 or self.tower is not None):
                     self.ai_end = True
                     self.marker_fig = None
-                    self.change_player(fig)
                     pygame.time.set_timer(MYEVENTTYPE, 0)
+                    self.change_player()
 
     def to_real(self, coord, type):
         if type == 'x':
@@ -523,8 +523,6 @@ class Board:
         else:
             if AI and not self.ai_end:
                 self.ai_move(fig)
-                if self.ai_end:
-                    print('Продолжаем разработку')
             if not AI or self.ai_end:
                 self.player = 1
                 for i in self.players:
@@ -532,49 +530,60 @@ class Board:
 
     def ai_move(self, fig):
         print('ИИ в разработке')
-        res = False
-        ai = self.players[1]
-        ai_figures = list(filter(lambda x: x.color == 2, self.figures))
-        place_vars = []
-        for i in range(8):
-            if self.can_place(7, i):
-                place_vars.append(i)
-        self.do_variants()
-        field_vars = []
-        for i in range(3):
-            if ai.fields[i] < 3:
-                field_vars.append(i)
-        if len(place_vars) > 0 and len(self.variants) > 0:
-            self.ai_end = True
-            self.on_click((14, choice(place_vars) + 1))
-            self.get_key(str(choice(range(len(self.variants))) + 1), 0)
-            res = True
-        if ai.money >= 10 and len(field_vars) > 0:
-            self.upgrade_fields(2, choice(field_vars))
-        elif len(ai_figures) > 0 and not res:
-            if fig is None:
-                fig = choice(ai_figures)
-            enemies = self.enemies(fig)
-            if len(enemies) > 0:
-                self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                print(fig.name)
-                enemy = choice(enemies)
-                self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+        if not HARD:
+            res = False
+            ai = self.players[1]
+            ai_figures = list(filter(lambda x: x.color == 2, self.figures))
+            place_vars = []
+            for i in range(8):
+                if self.can_place(7, i):
+                    place_vars.append(i)
+            self.do_variants()
+            field_vars = []
+            for i in range(3):
+                if ai.fields[i] < 3:
+                    field_vars.append(i)
+            if len(place_vars) > 0 and (len(self.variants) > 1 or len(self.variants) > 0 and len(ai_figures) < 3):
+                self.ai_end = True
+                self.on_click((14, choice(place_vars) + 1))
+                self.get_key(str(choice(range(len(self.variants))) + 1), 0)
                 res = True
-            else:
-                self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                print(fig.name)
-                go_vars = []
-                for x, y in [[-1, 0], [0, -1], [1, 0]]:
-                    xi, yi = fig.pos[0] + x, fig.pos[1] + y
-                    if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
-                        go_vars.append([xi, yi])
-                if len(go_vars) > 0:
-                    go_pos = choice(go_vars)
-                    self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+            if ai.money >= 10 and len(field_vars) > 0:
+                self.upgrade_fields(2, choice(field_vars))
+            elif len(ai_figures) > 0 and not res:
+                if fig is None:
+                    fig = choice(ai_figures)
+                enemies = self.enemies(fig)
+                if fig.pos[0] == 0 and self.players[0].towers[fig.pos[1] // 2] > 0:
+                    self.ai_end = True
+                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                    print(fig.name)
+                    self.on_click((fig.pos[0] + 7 - 1, fig.pos[1] + 1))
                     res = True
-        print('...')
-        return res
+                elif len(enemies) > 0:
+                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                    print(fig.name)
+                    enemy = choice(enemies)
+                    self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                    res = True
+                else:
+                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                    print(fig.name)
+                    go_vars = []
+                    # for x, y in [[-1, 0], [0, -1], [0, 1]]:
+                    for x, y in [[-1, 0]]:
+                        xi, yi = fig.pos[0] + x, fig.pos[1] + y
+                        if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
+                            go_vars.append([xi, yi])
+                    if len(go_vars) > 0:
+                        go_pos = choice(go_vars)
+                        self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+                        res = True
+            print('...')
+            return res
+        else:
+            # твой код
+            pass
 
 
 def terminate():
@@ -660,12 +669,14 @@ def main():
 
 
 pygame.init()
+pygame.display.set_caption('Король против Компа')
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play(-1)
 VOLUME = 0.5
 SOUND_OFF = False
 AI = True
-SHOW_AI_FIELDS = True
+HARD = False
+SHOW_AI_FIELDS = False
 SPEED = 50
 MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
@@ -675,5 +686,9 @@ screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 start_screen()
 board = Board(8, 8, cell_size)
 
-main()
+try:
+    main()
+except Exception as e:
+    print(e)
+    input()
 pygame.quit()
