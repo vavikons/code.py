@@ -469,10 +469,11 @@ class Board:
                     self.marker = [fig.pos[0], fig.pos[1]]
                     pygame.time.set_timer(MYEVENTTYPE, 0)
                     if AI and self.player == 2:
+                        self.ai_end = True
                         self.change_player(fig)
             if self.tower is None:
                 enemies = self.enemies(fig)
-                if self.fig_steps == 0 and (self.fig_hits == 0 or len(enemies) == 0 or self.tower is not None):
+                if self.fig_steps == 0 and (self.fig_hits == 0 or len(enemies) == 0):
                     self.ai_end = True
                     self.marker_fig = None
                     pygame.time.set_timer(MYEVENTTYPE, 0)
@@ -570,8 +571,7 @@ class Board:
                     self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
                     print(fig.name)
                     go_vars = []
-                    # for x, y in [[-1, 0], [0, -1], [0, 1]]:
-                    for x, y in [[-1, 0]]:
+                    for x, y in [[-1, 0], [0, -1], [0, 1]]:
                         xi, yi = fig.pos[0] + x, fig.pos[1] + y
                         if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
                             go_vars.append([xi, yi])
