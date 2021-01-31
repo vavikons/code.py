@@ -30,6 +30,11 @@ def flip(image):
     return pygame.transform.flip(image, True, False)
 
 
+def log(*text):
+    if PRINT_LOG:
+        print(' '.join(map(str, text)))
+
+
 class Player:
     def __init__(self, board):
         self.board = board
@@ -324,8 +329,10 @@ class Board:
                 self.enemy = None
 
                 self.tower = None
-                self.change_player()
                 pygame.time.set_timer(MYEVENTTYPE, 0)
+                if AI:
+                    self.ai_end = False
+                self.change_player()
             elif 0 < cell_coords[0] < 5 and 1 < cell_coords[1] < 8:
                 field_coords = (cell_coords[1] - 2) // 2
                 if self.field_marker is None or self.field_marker != field_coords:
@@ -347,6 +354,7 @@ class Board:
                 if cell != 0 and abs(cell.pos[0] - x) == 1 and\
                         self.players[self.player - 1].towers[tower] > 0:
                     if self.player == 1 and cell.pos[0] == 7:
+                        log(x, y)
                         self.marker_fig = cell
                         self.canmove = False
                         self.fig_hits = 1
@@ -355,6 +363,7 @@ class Board:
                         load_sound('удары_башня')
                         pygame.time.set_timer(MYEVENTTYPE, SPEED)
                     elif self.player == 2 and cell.pos[0] == 0:
+                        log(x, y)
                         self.marker_fig = cell
                         self.canmove = False
                         self.fig_hits = 1
@@ -366,7 +375,7 @@ class Board:
                 x, y = cell_coords
                 x -= 7
                 y -= 1
-                print(x, y)
+                log(x, y)
                 if self.marker is not None:
                     cell = self.board[self.marker[1]][self.marker[0]]
                     new_cell = self.board[y][x]
@@ -470,11 +479,11 @@ class Board:
                     pygame.time.set_timer(MYEVENTTYPE, 0)
                     if AI and self.player == 2:
                         self.ai_end = True
-                        self.change_player(fig)
             if self.tower is None:
                 enemies = self.enemies(fig)
                 if self.fig_steps == 0 and (self.fig_hits == 0 or len(enemies) == 0):
-                    self.ai_end = True
+                    if AI and self.player == 2:
+                        self.ai_end = True
                     self.marker_fig = None
                     pygame.time.set_timer(MYEVENTTYPE, 0)
                     self.change_player()
@@ -530,7 +539,7 @@ class Board:
                     i.money += 1
 
     def ai_move(self, fig):
-        print('ИИ в разработке')
+        log('ИИ в разработке')
         if not HARD:
             res = False
             ai = self.players[1]
@@ -548,28 +557,32 @@ class Board:
                 self.ai_end = True
                 self.on_click((14, choice(place_vars) + 1))
                 self.get_key(str(choice(range(len(self.variants))) + 1), 0)
+                log('place')
                 res = True
             if ai.money >= 10 and len(field_vars) > 0:
                 self.upgrade_fields(2, choice(field_vars))
-            elif len(ai_figures) > 0 and not res:
+                log('-field')
+            if len(ai_figures) > 0 and not res:
                 if fig is None:
                     fig = choice(ai_figures)
                 enemies = self.enemies(fig)
                 if fig.pos[0] == 0 and self.players[0].towers[fig.pos[1] // 2] > 0:
                     self.ai_end = True
                     self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    print(fig.name)
+                    log(fig.name)
                     self.on_click((fig.pos[0] + 7 - 1, fig.pos[1] + 1))
+                    log('tower')
                     res = True
                 elif len(enemies) > 0:
                     self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    print(fig.name)
+                    log(fig.name)
                     enemy = choice(enemies)
                     self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                    log('attack', enemy.name)
                     res = True
                 else:
                     self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    print(fig.name)
+                    log(fig.name)
                     go_vars = []
                     for x, y in [[-1, 0], [0, -1], [0, 1]]:
                         xi, yi = fig.pos[0] + x, fig.pos[1] + y
@@ -578,9 +591,11 @@ class Board:
                     if len(go_vars) > 0:
                         go_pos = choice(go_vars)
                         self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+                        log('move')
                         res = True
-            print('...')
-            return res
+            if not res:
+                self.ai_end = True
+            log('...')
         else:
             # твой код
             pass
@@ -668,17 +683,21 @@ def main():
             break
 
 
-pygame.init()
-pygame.display.set_caption('Король против Компа')
-pygame.mixer.music.load('sound/фон.mid')
-pygame.mixer.music.play(-1)
 VOLUME = 0.5
-SOUND_OFF = False
+SOUND_OFF = True
 AI = True
 HARD = False
 SHOW_AI_FIELDS = False
 SPEED = 50
+PRINT_LOG = True
+
+pygame.init()
+pygame.display.set_caption('Король против Компа')
+pygame.mixer.music.load('sound/фон.mid')
+pygame.mixer.music.play(-1)
 MYEVENTTYPE = pygame.USEREVENT + 1
+if SOUND_OFF:
+    pygame.mixer.music.pause()
 infoObject = pygame.display.Info()
 cell_size = min([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
@@ -689,6 +708,6 @@ board = Board(8, 8, cell_size)
 try:
     main()
 except Exception as e:
-    print(e)
+    log(e)
     input()
 pygame.quit()
