@@ -64,7 +64,7 @@ class Figure:
 
     def copy(self, color):
         res = Figure(self, self.name, self.food, self.hps, self.hits, self.steps, self.money)
-        res.color = self.board.player
+        res.color = color
         return res
 
     def get_name(self, num=1):
@@ -127,7 +127,7 @@ class Board:
         self.variants = []
         self.personages = [Figure(self, 'мечник', 1, 2, 1, 1, 2),
                            Figure(self, 'всадник', 2, 3, 1, 2, 4),
-                           Figure(self, 'копейщик', 1, 2, 2, 1, 6),]
+                           Figure(self, 'копейщик', 1, 2, 2, 1, 6)]
 
         self.ai_end = True
 
@@ -352,7 +352,7 @@ class Board:
                 tower = y // 2
                 cell = self.board[self.marker[1]][self.marker[0]]
                 if cell != 0 and abs(cell.pos[0] - x) == 1 and\
-                        self.players[self.player - 1].towers[tower] > 0:
+                        self.players[self.player - 2].towers[tower] > 0:
                     if self.player == 1 and cell.pos[0] == 7:
                         log(x, y)
                         self.marker_fig = cell
@@ -471,7 +471,7 @@ class Board:
                 self.hit_count -= 1
                 if self.hit_count == 0:
                     self.canmove = True
-                    self.players[self.player - 2].towers[self.tower[0]] -= 1
+                    self.players[self.tower[1] - 1].towers[self.tower[0]] -= 1
                     self.fig_steps = 0
                     self.fig_hits = 0
                     self.tower = None
@@ -488,8 +488,8 @@ class Board:
                     pygame.time.set_timer(MYEVENTTYPE, 0)
                     self.change_player()
 
-    def to_real(self, coord, type):
-        if type == 'x':
+    def to_real(self, coord, direct):
+        if direct == 'x':
             return coord * self.cell_size + self.left
         else:
             return coord * self.cell_size + self.top
@@ -695,9 +695,9 @@ pygame.init()
 pygame.display.set_caption('Король против Компа')
 pygame.mixer.music.load('sound/фон.mid')
 pygame.mixer.music.play(-1)
-MYEVENTTYPE = pygame.USEREVENT + 1
 if SOUND_OFF:
     pygame.mixer.music.pause()
+MYEVENTTYPE = pygame.USEREVENT + 1
 infoObject = pygame.display.Info()
 cell_size = min([infoObject.current_w // 16, infoObject.current_h // 9])
 size = width, height = cell_size * 16, cell_size * 9
