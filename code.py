@@ -684,7 +684,7 @@ def main():
 
 
 VOLUME = 0.5
-SOUND_OFF = True
+SOUND_OFF = False
 AI = True
 HARD = False
 SHOW_AI_FIELDS = False
