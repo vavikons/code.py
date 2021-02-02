@@ -4,6 +4,88 @@ import sys
 from random import choice
 
 
+def main():
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                board.get_click(event.pos)
+            if event.type == pygame.KEYDOWN:
+                board.get_key(event.unicode, event.key)
+            if event.type == MYEVENTTYPE:
+                board.myevent()
+        screen.fill((0, 153, 0))
+        image = load_image("фон")
+        image = scale(image, size)
+        screen.blit(image, (0, 0))
+        board.render(screen)
+        pygame.display.flip()
+        if sum(board.players[0].towers) == 0 or \
+                sum(board.players[1].towers) == 0:
+            end_screen(board)
+            break
+
+
+def start_screen():
+    screen.fill((0, 153, 0))
+    image = load_image("стартовый_фон")
+    image = scale(image, size)
+    screen.blit(image, (0, 0))
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                return
+        pygame.display.flip()
+
+
+def info_screen(board):
+    board.canmove = False
+    page = 1
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cell = board.get_cell(event.pos)
+                if cell[0] == 15 and cell[1] == 0:
+                    board.canmove = True
+                    return
+                elif page == 1 and cell[0] == 15 and cell[1] == 8:
+                    page = 2
+                elif page == 2 and cell[0] == 0 and cell[1] == 8:
+                    page = 1
+        screen.fill((205, 183, 135))
+        image = load_image(f"правила_фон_{page}")
+        image = scale(image, size)
+        screen.blit(image, (0, 0))
+        pygame.display.flip()
+
+
+def end_screen(board):
+    screen.fill((0, 153, 0))
+    if sum(board.players[0].towers) == 0:
+        name = 'конечный_фон_1'
+    else:
+        name = 'конечный_фон_2'
+    image = load_image(name)
+    image = scale(image, size)
+    screen.blit(image, (0, 0))
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                return
+        pygame.display.flip()
+
+
+def terminate():
+    pygame.quit()
+    sys.exit()
+
+
 def load_image(name, extension='.png'):
     fullname = os.path.join('pictures', name)
     fullname += extension
@@ -595,88 +677,6 @@ class Board:
         if not res:
             self.ai_end = True
         log('...')
-
-
-def terminate():
-    pygame.quit()
-    sys.exit()
-
-
-def start_screen():
-    screen.fill((0, 153, 0))
-    image = load_image("стартовый_фон")
-    image = scale(image, size)
-    screen.blit(image, (0, 0))
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                return
-        pygame.display.flip()
-
-
-def info_screen(board):
-    board.canmove = False
-    page = 1
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                cell = board.get_cell(event.pos)
-                if cell[0] == 15 and cell[1] == 0:
-                    board.canmove = True
-                    return
-                elif page == 1 and cell[0] == 15 and cell[1] == 8:
-                    page = 2
-                elif page == 2 and cell[0] == 0 and cell[1] == 8:
-                    page = 1
-        screen.fill((205, 183, 135))
-        image = load_image(f"правила_фон_{page}")
-        image = scale(image, size)
-        screen.blit(image, (0, 0))
-        pygame.display.flip()
-
-
-def end_screen(board):
-    screen.fill((0, 153, 0))
-    if sum(board.players[0].towers) == 0:
-        name = 'конечный_фон_1'
-    else:
-        name = 'конечный_фон_2'
-    image = load_image(name)
-    image = scale(image, size)
-    screen.blit(image, (0, 0))
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                return
-        pygame.display.flip()
-
-
-def main():
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return None
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                board.get_click(event.pos)
-            if event.type == pygame.KEYDOWN:
-                board.get_key(event.unicode, event.key)
-            if event.type == MYEVENTTYPE:
-                board.myevent()
-        screen.fill((0, 153, 0))
-        image = load_image("фон")
-        image = scale(image, size)
-        screen.blit(image, (0, 0))
-        board.render(screen)
-        pygame.display.flip()
-        if sum(board.players[0].towers) == 0 or \
-                sum(board.players[1].towers) == 0:
-            end_screen(board)
-            break
 
 
 VOLUME = 0.5
