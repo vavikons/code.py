@@ -539,66 +539,62 @@ class Board:
                     i.money += 1
 
     def ai_move(self, fig):
-        log('ИИ в разработке')
-        if not HARD:
-            res = False
-            ai = self.players[1]
-            ai_figures = list(filter(lambda x: x.color == 2, self.figures))
-            place_vars = []
-            for i in range(8):
-                if self.can_place(7, i):
-                    place_vars.append(i)
-            self.do_variants()
-            field_vars = []
-            for i in range(3):
-                if ai.fields[i] < 3:
-                    field_vars.append(i)
-            if len(place_vars) > 0 and (len(self.variants) > 1 or len(self.variants) > 0 and len(ai_figures) < 3):
+        log('ИИ')
+        res = False
+        ai = self.players[1]
+        ai_figures = list(filter(lambda x: x.color == 2, self.figures))
+        place_vars = []
+        for i in range(8):
+            if self.can_place(7, i):
+                place_vars.append(i)
+        self.do_variants()
+        field_vars = []
+        for i in range(3):
+            if ai.fields[i] < 3:
+                field_vars.append(i)
+        if len(place_vars) > 0 and (len(self.variants) > 1 or len(self.variants) > 0 and len(ai_figures) < 3):
+            self.ai_end = True
+            self.on_click((14, choice(place_vars) + 1))
+            self.get_key(str(choice(range(len(self.variants))) + 1), 0)
+            log('place')
+            res = True
+        if ai.money >= 10 and len(field_vars) > 0:
+            self.upgrade_fields(2, choice(field_vars))
+            log('-field')
+        if len(ai_figures) > 0 and not res:
+            if fig is None:
+                fig = choice(ai_figures)
+            enemies = self.enemies(fig)
+            if fig.pos[0] == 0 and self.players[0].towers[fig.pos[1] // 2] > 0:
                 self.ai_end = True
-                self.on_click((14, choice(place_vars) + 1))
-                self.get_key(str(choice(range(len(self.variants))) + 1), 0)
-                log('place')
+                self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                log(fig.name)
+                self.on_click((fig.pos[0] + 7 - 1, fig.pos[1] + 1))
+                log('tower')
                 res = True
-            if ai.money >= 10 and len(field_vars) > 0:
-                self.upgrade_fields(2, choice(field_vars))
-                log('-field')
-            if len(ai_figures) > 0 and not res:
-                if fig is None:
-                    fig = choice(ai_figures)
-                enemies = self.enemies(fig)
-                if fig.pos[0] == 0 and self.players[0].towers[fig.pos[1] // 2] > 0:
-                    self.ai_end = True
-                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    log(fig.name)
-                    self.on_click((fig.pos[0] + 7 - 1, fig.pos[1] + 1))
-                    log('tower')
+            elif len(enemies) > 0:
+                self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                log(fig.name)
+                enemy = choice(enemies)
+                self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
+                log('attack', enemy.name)
+                res = True
+            else:
+                self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
+                log(fig.name)
+                go_vars = []
+                for x, y in [[-1, 0], [0, -1], [0, 1]]:
+                    xi, yi = fig.pos[0] + x, fig.pos[1] + y
+                    if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
+                        go_vars.append([xi, yi])
+                if len(go_vars) > 0:
+                    go_pos = choice(go_vars)
+                    self.on_click((go_pos[0] + 7, go_pos[1] + 1))
+                    log('move')
                     res = True
-                elif len(enemies) > 0:
-                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    log(fig.name)
-                    enemy = choice(enemies)
-                    self.on_click((enemy.pos[0] + 7, enemy.pos[1] + 1))
-                    log('attack', enemy.name)
-                    res = True
-                else:
-                    self.on_click((fig.pos[0] + 7, fig.pos[1] + 1))
-                    log(fig.name)
-                    go_vars = []
-                    for x, y in [[-1, 0], [0, -1], [0, 1]]:
-                        xi, yi = fig.pos[0] + x, fig.pos[1] + y
-                        if 0 <= xi <= 7 and 0 <= yi <= 7 and self.board[yi][xi] == 0:
-                            go_vars.append([xi, yi])
-                    if len(go_vars) > 0:
-                        go_pos = choice(go_vars)
-                        self.on_click((go_pos[0] + 7, go_pos[1] + 1))
-                        log('move')
-                        res = True
-            if not res:
-                self.ai_end = True
-            log('...')
-        else:
-            # твой код
-            pass
+        if not res:
+            self.ai_end = True
+        log('...')
 
 
 def terminate():
@@ -686,7 +682,6 @@ def main():
 VOLUME = 0.5
 SOUND_OFF = False
 AI = True
-HARD = False
 SHOW_AI_FIELDS = False
 SPEED = 50
 PRINT_LOG = True
